@@ -109,6 +109,7 @@ def send_and_pin_diagram(location: Location, diagram_bytes) -> Optional[DiagramM
         client = TelegramClient(location.telegram_bot_token)
         
         # Send the photo (no caption)
+        today = timezone.localdate()
         message_id = client.send_photo(
             chat_id=location.telegram_chat_id,
             photo=diagram_bytes,
@@ -153,6 +154,7 @@ def send_diagram_without_pin(location: Location, diagram_bytes) -> Optional[int]
         client = TelegramClient(location.telegram_bot_token)
         
         # Send the photo (no caption)
+        today = timezone.localdate()
         message_id = client.send_photo(
             chat_id=location.telegram_chat_id,
             photo=diagram_bytes,

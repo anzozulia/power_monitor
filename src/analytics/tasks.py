@@ -64,7 +64,7 @@ def update_hourly_diagrams() -> None:
     """
     Update all pinned diagrams with fresh data.
     
-    Should run every hour at :00.
+    Should run every 15 minutes at :15/:30/:45.
     """
     from analytics.diagram import generate_diagram_for_location
     from analytics.services import get_today_diagram_message, update_diagram_image

@@ -19,6 +19,7 @@ logger = logging.getLogger('worker')
 
 # Configuration
 HEARTBEAT_CHECK_INTERVAL = 5  # seconds
+DIAGRAM_UPDATE_INTERVAL_MINUTES = 15
 
 
 class Command(BaseCommand):
@@ -36,7 +37,7 @@ class Command(BaseCommand):
         signal.signal(signal.SIGINT, self._handle_signal)
         
         last_heartbeat_check = time.time()
-        last_hourly_update = -1
+        last_diagram_update = None
         last_daily_run = None
         
         # Avoid running daily diagrams on boot before midnight hour
@@ -51,6 +52,7 @@ class Command(BaseCommand):
                 now = timezone.now()
                 current_hour = now.hour
                 current_date = now.date()
+                current_minute = now.minute
                 current_time = time.time()
                 
                 # Run heartbeat checks every 5 seconds
@@ -58,15 +60,23 @@ class Command(BaseCommand):
                     last_heartbeat_check = current_time
                     self._run_heartbeat_check()
                 
-                # Run hourly diagram update once per hour (catch up if missed :00)
-                if current_hour != last_hourly_update:
-                    last_hourly_update = current_hour
-                    self._run_hourly_diagrams()
-
-                # Run daily diagrams during the midnight hour
-                if current_hour == 0 and last_daily_run != current_date:
+                # Run daily diagrams exactly at midnight (00:00)
+                if (
+                    current_hour == 0
+                    and current_minute == 0
+                    and last_daily_run != current_date
+                ):
                     last_daily_run = current_date
                     self._run_daily_diagrams()
+
+                # Update pinned diagram every 15 minutes, including :00 (except midnight)
+                if current_minute % DIAGRAM_UPDATE_INTERVAL_MINUTES == 0:
+                    if current_hour == 0 and current_minute == 0:
+                        continue
+                    update_key = (current_date, current_hour, current_minute)
+                    if last_diagram_update != update_key:
+                        last_diagram_update = update_key
+                        self._run_hourly_diagrams()
                 
                 # Sleep for 1 second before next iteration
                 time.sleep(1)
