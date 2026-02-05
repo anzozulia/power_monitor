@@ -23,7 +23,7 @@
             <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4">
                 <dt class="text-sm font-medium text-gray-500">Heartbeat Endpoint</dt>
                 <dd class="mt-1 text-sm text-gray-900 sm:col-span-2 sm:mt-0">
-                    <code class="bg-gray-100 px-2 py-1 rounded font-mono text-sm">{{ endpoint_url }}</code>
+                    <code class="bg-gray-100 px-2 py-1 rounded font-mono text-sm break-all">{{ endpoint_url_with_key }}</code>
                 </dd>
             </div>
             <div class="py-4 sm:grid sm:grid-cols-3 sm:gap-4">
@@ -64,12 +64,13 @@ const char* ssid = "YOUR_WIFI_SSID";
 const char* password = "YOUR_WIFI_PASSWORD";
 
 // Power Monitor Configuration - DO NOT CHANGE
-const char* serverUrl = "{{ endpoint_url }}";
-const char* apiKey = "{{ location.api_key }}";
+const char* serverUrl = "{{ endpoint_url_with_key }}";
 const int heartbeatInterval = {{ location.heartbeat_period_seconds }}000; // {{ location.heartbeat_period_seconds }} seconds
 
 void setup() {
   Serial.begin(115200);
+  Serial.println("\nStarting ESP32...");
+  delay(5000);
   WiFi.begin(ssid, password);
   
   Serial.print("Connecting to WiFi");
@@ -86,10 +87,8 @@ void loop() {
   if (WiFi.status() == WL_CONNECTED) {
     HTTPClient http;
     http.begin(serverUrl);
-    http.addHeader("X-API-Key", apiKey);
-    http.addHeader("Content-Type", "application/json");
     
-    int httpCode = http.POST("");
+    int httpCode = http.GET();
     
     if (httpCode > 0) {
       Serial.printf("[%lu] Heartbeat sent: %d\n", millis(), httpCode);

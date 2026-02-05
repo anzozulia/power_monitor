@@ -141,10 +141,11 @@ def location_config(request, pk):
     
     # Build the heartbeat endpoint URL
     host = request.get_host()
-    scheme = 'https' if request.is_secure() else 'http'
-    endpoint_url = f"{scheme}://{host}/api/heartbeat/"
+    endpoint_url = f"http://{host}/api/heartbeat/"
+    endpoint_url_with_key = f"{endpoint_url}?api_key={location.api_key}"
     
     return render(request, 'admin_panel/locations/config.html', {
         'location': location,
         'endpoint_url': endpoint_url,
+        'endpoint_url_with_key': endpoint_url_with_key,
     })

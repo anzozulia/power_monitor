@@ -4,13 +4,12 @@ Heartbeat API Views
 Handles heartbeat reception from ESP32 devices.
 """
 
-import json
 import logging
 
 from django.http import JsonResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET
 
 from core.models import Location
 
@@ -20,12 +19,12 @@ logger = logging.getLogger('monitoring')
 
 
 @csrf_exempt
-@require_POST
+@require_GET
 def heartbeat_view(request):
     """
     Receive heartbeat from ESP32 device.
     
-    Expects X-API-Key header with location's API key.
+    Expects api_key query param or X-API-Key header.
     Returns JSON response with status.
     """
     # Authenticate the request
