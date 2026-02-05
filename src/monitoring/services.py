@@ -80,8 +80,14 @@ def _handle_power_restoration(location: Location, restored_at: datetime) -> None
     # Calculate how long power was off
     duration_seconds = None
     if location.last_status_change_at:
-        duration = restored_at - location.last_status_change_at
-        duration_seconds = int(duration.total_seconds())
+        last_heartbeat_before_off = (
+            location.heartbeats.filter(received_at__lte=location.last_status_change_at)
+            .order_by('-received_at')
+            .first()
+        )
+        if last_heartbeat_before_off:
+            duration = restored_at - last_heartbeat_before_off.received_at
+            duration_seconds = int(duration.total_seconds())
     
     # Update location status
     location.current_power_status = PowerStatus.ON
@@ -151,8 +157,14 @@ def _handle_power_outage(location: Location, detected_at: datetime) -> None:
     
     duration_seconds = None
     if location.last_status_change_at and location.last_heartbeat_at:
-        duration = location.last_heartbeat_at - location.last_status_change_at
-        duration_seconds = int(duration.total_seconds())
+        first_heartbeat_after_on = (
+            location.heartbeats.filter(received_at__gte=location.last_status_change_at)
+            .order_by('received_at')
+            .first()
+        )
+        if first_heartbeat_after_on:
+            duration = location.last_heartbeat_at - first_heartbeat_after_on.received_at
+            duration_seconds = int(duration.total_seconds())
     
     # Update location status (use last heartbeat as the actual outage time)
     location.current_power_status = PowerStatus.OFF
