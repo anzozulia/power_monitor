@@ -26,6 +26,7 @@ services:
       context: .
       target: production
     container_name: power_monitor_app_prod
+    user: "${UID}:${GID}"
     restart: unless-stopped
     env_file:
       - .env.docker_production
@@ -47,6 +48,7 @@ services:
       context: .
       target: production
     container_name: power_monitor_worker_prod
+    user: "${UID}:${GID}"
     restart: unless-stopped
     env_file:
       - .env.docker_production
