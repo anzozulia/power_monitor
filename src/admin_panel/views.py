@@ -8,6 +8,7 @@ from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
 from core.models import DiagramMessage, Heartbeat, Location, PowerEvent, PowerStatus
@@ -73,7 +74,7 @@ def location_create(request):
         if form.is_valid():
             location = form.save()
             messages.success(request, f'Location "{location.name}" created successfully.')
-            return redirect('admin_panel:location_config', pk=location.pk)
+            return redirect('admin_panel:location_detail', pk=location.pk)
     else:
         form = LocationForm()
     
@@ -89,10 +90,15 @@ def location_detail(request, pk):
     """View location details and recent events."""
     location = get_object_or_404(Location, pk=pk)
     recent_events = location.power_events.all()[:10]
+    host = request.get_host()
+    endpoint_url = f"http://{host}/api/heartbeat/"
+    endpoint_url_with_key = f"{endpoint_url}?api_key={location.api_key}"
     
     return render(request, 'admin_panel/locations/detail.html', {
         'location': location,
         'recent_events': recent_events,
+        'endpoint_url': endpoint_url,
+        'endpoint_url_with_key': endpoint_url_with_key,
     })
 
 
@@ -170,17 +176,15 @@ def location_reset(request, pk):
 
 
 @login_required
-def location_config(request, pk):
-    """Display ESP32 configuration for a location."""
+def location_toggle_offline_detection(request, pk):
+    """Toggle offline detection for maintenance."""
     location = get_object_or_404(Location, pk=pk)
-    
-    # Build the heartbeat endpoint URL
-    host = request.get_host()
-    endpoint_url = f"http://{host}/api/heartbeat/"
-    endpoint_url_with_key = f"{endpoint_url}?api_key={location.api_key}"
-    
-    return render(request, 'admin_panel/locations/config.html', {
-        'location': location,
-        'endpoint_url': endpoint_url,
-        'endpoint_url_with_key': endpoint_url_with_key,
-    })
+
+    if request.method == 'POST':
+        location.is_offline_detection_disabled = not location.is_offline_detection_disabled
+        location.save(update_fields=['is_offline_detection_disabled', 'updated_at'])
+        return JsonResponse({
+            'maintenance_mode': location.is_offline_detection_disabled,
+        })
+
+    return JsonResponse({'detail': 'Method not allowed.'}, status=405)

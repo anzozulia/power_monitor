@@ -1,7 +1,7 @@
 """
 Heartbeat API Views
 
-Handles heartbeat reception from ESP32 devices.
+Handles heartbeat reception from devices.
 """
 
 import logging
@@ -22,7 +22,7 @@ logger = logging.getLogger('monitoring')
 @require_GET
 def heartbeat_view(request):
     """
-    Receive heartbeat from ESP32 device.
+    Receive heartbeat from a device.
     
     Expects api_key query param or X-API-Key header.
     Returns JSON response with status.

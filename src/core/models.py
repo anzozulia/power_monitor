@@ -3,7 +3,7 @@ Power Outage Monitor - Database Models
 
 Entities:
 - Location: Monitored property with configuration
-- Heartbeat: Individual heartbeat signal from ESP32
+- Heartbeat: Individual heartbeat signal from device
 - PowerEvent: Power status change record
 - DiagramMessage: Telegram message tracking for diagrams
 """
@@ -39,7 +39,7 @@ class Location(models.Model):
     """
     Represents a monitored property/house with its configuration.
     
-    Each location has its own Telegram bot settings and ESP32 API key.
+    Each location has its own Telegram bot settings and device API key.
     """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=100, unique=True)
@@ -63,7 +63,7 @@ class Location(models.Model):
         default=AlertLanguage.EN,
     )
     
-    # ESP32 authentication
+    # Device authentication
     api_key = models.CharField(max_length=64, unique=True, editable=False)
     
     # Power status tracking
@@ -79,6 +79,12 @@ class Location(models.Model):
     # Alerting status
     alerting_enabled = models.BooleanField(default=True)
     alerting_failed = models.BooleanField(default=False)
+
+    # Maintenance controls
+    is_offline_detection_disabled = models.BooleanField(
+        default=False,
+        help_text="Disable auto power-off when heartbeat timeout exceeds grace period.",
+    )
     
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
@@ -137,9 +143,9 @@ class Location(models.Model):
 
 class Heartbeat(models.Model):
     """
-    Records each heartbeat signal received from ESP32 devices.
+    Records each heartbeat signal received from devices.
     
-    High-volume table - each ESP32 sends a heartbeat every N seconds.
+    High-volume table - each device sends a heartbeat every N seconds.
     """
     id = models.BigAutoField(primary_key=True)
     location = models.ForeignKey(

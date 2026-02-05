@@ -5,6 +5,7 @@ Scheduled tasks for diagram generation and updates.
 """
 
 import logging
+from datetime import timedelta
 
 from django.utils import timezone
 
@@ -40,14 +41,15 @@ def generate_daily_diagrams() -> None:
             # Step 1: Update yesterday's diagram one final time
             yesterday_diagram = get_yesterday_pinned_diagram(location)
             if yesterday_diagram:
-                diagram_bytes = generate_diagram_for_location(location)
+                yesterday = timezone.localdate() - timedelta(days=1)
+                diagram_bytes = generate_diagram_for_location(location, target_date=yesterday)
                 update_diagram_image(location, yesterday_diagram, diagram_bytes)
                 
                 # Step 2: Unpin yesterday's diagram
                 unpin_diagram(location, yesterday_diagram)
             
             # Step 3: Generate and send new diagram
-            diagram_bytes = generate_diagram_for_location(location)
+            diagram_bytes = generate_diagram_for_location(location, target_date=timezone.localdate())
             send_and_pin_diagram(location, diagram_bytes)
             
             logger.info(f"Daily diagram complete for {location.name}")

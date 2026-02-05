@@ -1,7 +1,7 @@
 """
 Heartbeat API Authentication
 
-API key authentication for ESP32 devices.
+API key authentication for devices.
 """
 
 from typing import Optional

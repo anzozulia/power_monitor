@@ -17,10 +17,10 @@ logger = logging.getLogger('monitoring')
 
 def process_heartbeat(location: Location, received_at: Optional[datetime] = None) -> None:
     """
-    Process a heartbeat from an ESP32 device.
+    Process a heartbeat from a device.
     
     Handles:
-    - Recording the heartbeat
+    - Recording only state-switch heartbeats
     - Starting monitoring on first heartbeat
     - Detecting power restoration after outage
     
@@ -31,16 +31,17 @@ def process_heartbeat(location: Location, received_at: Optional[datetime] = None
     if received_at is None:
         received_at = timezone.now()
     
-    # Create heartbeat record
-    Heartbeat.objects.create(location=location, received_at=received_at)
-    
+    # Record only the first heartbeat after power on.
+    # Regular heartbeats update timestamps but are not stored in DB.
     # Check if this is the first heartbeat (start monitoring)
     if not location.is_monitoring_active:
+        Heartbeat.objects.create(location=location, received_at=received_at)
         _start_monitoring(location, received_at)
         return
     
     # Check if this is a power restoration (was off, now getting heartbeats)
     if location.current_power_status == PowerStatus.OFF:
+        Heartbeat.objects.create(location=location, received_at=received_at)
         _handle_power_restoration(location, received_at)
     
     # Update last heartbeat timestamp
@@ -77,17 +78,11 @@ def _handle_power_restoration(location: Location, restored_at: datetime) -> None
     """Handle power coming back on after an outage."""
     logger.info(f"Power restored at {location.name}")
     
-    # Calculate how long power was off
+    # Calculate how long power was off (from last heartbeat before off to first after on)
     duration_seconds = None
     if location.last_status_change_at:
-        last_heartbeat_before_off = (
-            location.heartbeats.filter(received_at__lte=location.last_status_change_at)
-            .order_by('-received_at')
-            .first()
-        )
-        if last_heartbeat_before_off:
-            duration = restored_at - last_heartbeat_before_off.received_at
-            duration_seconds = int(duration.total_seconds())
+        duration = restored_at - location.last_status_change_at
+        duration_seconds = int(duration.total_seconds())
     
     # Update location status
     location.current_power_status = PowerStatus.ON
@@ -132,6 +127,8 @@ def check_all_locations_for_outages() -> int:
     
     for location in locations:
         if _is_location_timed_out(location, now):
+            if location.is_offline_detection_disabled:
+                continue
             _handle_power_outage(location, now)
             outages_detected += 1
     
@@ -151,20 +148,22 @@ def _handle_power_outage(location: Location, detected_at: datetime) -> None:
     """Handle a detected power outage."""
     logger.warning(f"Power outage detected at {location.name}")
     
-    # Calculate how long power was on (from status change to last heartbeat, not detection time)
-    # The actual outage happened at last_heartbeat_at, not detected_at
+    # Calculate how long power was on (from first heartbeat after on to last before off)
+    # The actual outage happened at last_heartbeat_at, not detected_at.
     outage_time = location.last_heartbeat_at or detected_at
     
     duration_seconds = None
     if location.last_status_change_at and location.last_heartbeat_at:
-        first_heartbeat_after_on = (
-            location.heartbeats.filter(received_at__gte=location.last_status_change_at)
-            .order_by('received_at')
-            .first()
-        )
-        if first_heartbeat_after_on:
-            duration = location.last_heartbeat_at - first_heartbeat_after_on.received_at
-            duration_seconds = int(duration.total_seconds())
+        duration = location.last_heartbeat_at - location.last_status_change_at
+        duration_seconds = int(duration.total_seconds())
+
+    if outage_time:
+        has_heartbeat = Heartbeat.objects.filter(
+            location=location,
+            received_at=outage_time,
+        ).exists()
+        if not has_heartbeat:
+            Heartbeat.objects.create(location=location, received_at=outage_time)
     
     # Update location status (use last heartbeat as the actual outage time)
     location.current_power_status = PowerStatus.OFF
@@ -207,6 +206,8 @@ def recover_from_restart() -> None:
         # but don't send alert (we don't know exactly when it went off)
         if location.current_power_status == PowerStatus.ON:
             if _is_location_timed_out(location, now):
+                if location.is_offline_detection_disabled:
+                    continue
                 logger.info(f"Marking {location.name} as offline after restart")
                 location.current_power_status = PowerStatus.OFF
                 location.last_status_change_at = now
@@ -215,7 +216,7 @@ def recover_from_restart() -> None:
                     'last_status_change_at',
                     'updated_at',
                 ])
-                
+
                 # Create event but don't alert
                 PowerEvent.objects.create(
                     location=location,
@@ -225,3 +226,38 @@ def recover_from_restart() -> None:
                     alert_sent=True,  # Mark as sent to skip alerting
                     alert_sent_at=now,
                 )
+
+
+def cleanup_non_valuable_heartbeats() -> int:
+    """
+    Remove heartbeats that are not tied to power state transitions.
+
+    Keeps heartbeats that match power event timestamps and key state markers.
+    """
+    deleted_count = 0
+    locations = Location.objects.all()
+
+    for location in locations:
+        important_times = list(
+            PowerEvent.objects.filter(location=location)
+            .values_list('occurred_at', flat=True)
+        )
+        if location.monitoring_started_at:
+            important_times.append(location.monitoring_started_at)
+        if location.last_status_change_at:
+            important_times.append(location.last_status_change_at)
+
+        if not important_times:
+            continue
+
+        deleted, _ = (
+            Heartbeat.objects.filter(location=location)
+            .exclude(received_at__in=important_times)
+            .delete()
+        )
+        deleted_count += deleted
+
+    if deleted_count:
+        logger.info("Deleted %s non-valuable heartbeats on startup.", deleted_count)
+
+    return deleted_count

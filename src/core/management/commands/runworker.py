@@ -47,7 +47,6 @@ class Command(BaseCommand):
                 now = timezone.now()
                 current_hour = now.hour
                 current_date = now.date()
-                current_minute = now.minute
                 current_time = time.time()
                 
                 # Run heartbeat checks every 5 seconds
@@ -55,16 +54,15 @@ class Command(BaseCommand):
                     last_heartbeat_check = current_time
                     self._run_heartbeat_check()
                 
-                # Run hourly diagram update at the start of each hour
-                if current_minute == 0 and current_hour != last_hourly_update:
+                # Run hourly diagram update once per hour (catch up if missed :00)
+                if current_hour != last_hourly_update:
                     last_hourly_update = current_hour
-                    
-                    # At midnight (hour 0), run daily diagram generation
-                    if current_hour == 0 and last_daily_run != current_date:
+
+                    # Run daily diagrams at midnight, or catch up once if worker restarted
+                    if last_daily_run != current_date and (current_hour == 0 or last_daily_run is None):
                         last_daily_run = current_date
                         self._run_daily_diagrams()
                     else:
-                        # Otherwise just run hourly update
                         self._run_hourly_diagrams()
                 
                 # Sleep for 1 second before next iteration

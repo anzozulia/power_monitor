@@ -13,10 +13,6 @@
         </div>
     </div>
     <div class="mt-4 flex md:ml-4 md:mt-0 space-x-3">
-        <a href="{% url 'admin_panel:location_config' pk=location.pk %}"
-           class="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
-            ESP32 Config
-        </a>
         <a href="{% url 'admin_panel:location_edit' pk=location.pk %}"
            class="inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500">
             Edit
@@ -81,10 +77,22 @@
                 <dd class="mt-1 text-sm text-gray-900">{{ location.grace_period_seconds }} seconds</dd>
             </div>
             <div>
+                <dt class="text-sm font-medium text-gray-500">Heartbeat Endpoint</dt>
+                <dd class="mt-1 text-sm text-gray-900">
+                    <code class="bg-gray-100 px-2 py-1 rounded font-mono text-sm break-all">{{ endpoint_url_with_key }}</code>
+                </dd>
+            </div>
+            <div>
+                <dt class="text-sm font-medium text-gray-500">API Key</dt>
+                <dd class="mt-1 text-sm text-gray-900">
+                    <code class="bg-gray-100 px-2 py-1 rounded font-mono text-sm break-all">{{ location.api_key }}</code>
+                </dd>
+            </div>
+            <div>
                 <dt class="text-sm font-medium text-gray-500">Monitoring Started</dt>
                 <dd class="mt-1 text-sm text-gray-900">
                     {% if location.monitoring_started_at %}
-                        {{ location.monitoring_started_at }}
+                        {{ location.monitoring_started_at|date:"Y-m-d H:i" }}
                     {% else %}
                         Not started (waiting for first heartbeat)
                     {% endif %}
@@ -94,7 +102,7 @@
                 <dt class="text-sm font-medium text-gray-500">Last Heartbeat</dt>
                 <dd class="mt-1 text-sm text-gray-900">
                     {% if location.last_heartbeat_at %}
-                        {{ location.last_heartbeat_at }} ({{ location.last_heartbeat_at|timesince }} ago)
+                        {{ location.last_heartbeat_at|date:"Y-m-d H:i" }} ({{ location.last_heartbeat_at|timesince }} ago)
                     {% else %}
                         Never
                     {% endif %}
@@ -104,7 +112,7 @@
                 <dt class="text-sm font-medium text-gray-500">Last Status Change</dt>
                 <dd class="mt-1 text-sm text-gray-900">
                     {% if location.last_status_change_at %}
-                        {{ location.last_status_change_at }} ({{ location.last_status_change_at|timesince }} ago)
+                        {{ location.last_status_change_at|date:"Y-m-d H:i" }} ({{ location.last_status_change_at|timesince }} ago)
                     {% else %}
                         Never
                     {% endif %}
@@ -120,6 +128,26 @@
                     {% else %}
                         Disabled
                     {% endif %}
+                </dd>
+            </div>
+            <div>
+                <dt class="text-sm font-medium text-gray-500">Maintenance Mode</dt>
+                <dd class="mt-1 text-sm text-gray-900">
+                    <button type="button"
+                            data-toggle-maintenance="true"
+                            data-toggle-url="{% url 'admin_panel:location_toggle_offline_detection' pk=location.pk %}"
+                            class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors {% if location.is_offline_detection_disabled %}bg-indigo-600{% else %}bg-gray-300{% endif %}"
+                            aria-pressed="{% if location.is_offline_detection_disabled %}true{% else %}false{% endif %}">
+                            <span class="sr-only">Toggle maintenance mode</span>
+                            <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform {% if location.is_offline_detection_disabled %}translate-x-6{% else %}translate-x-1{% endif %}"></span>
+                    </button>
+                    <span class="ml-2 text-sm text-gray-700" data-toggle-label>
+                        {% if location.is_offline_detection_disabled %}
+                            Enabled (ignore offline)
+                        {% else %}
+                            Disabled
+                        {% endif %}
+                    </span>
                 </dd>
             </div>
         </dl>
@@ -144,7 +172,7 @@
                         Power OFF
                     </span>
                     {% endif %}
-                    <span class="text-sm text-gray-500">{{ event.occurred_at }}</span>
+                    <span class="text-sm text-gray-500">{{ event.occurred_at|date:"Y-m-d H:i" }}</span>
                 </div>
                 <div class="text-sm text-gray-500">
                     {% if event.previous_state_duration_seconds %}
@@ -166,4 +194,56 @@
         ← Back to Locations
     </a>
 </div>
+
+<script>
+    const getCookie = (name) => {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) {
+            return parts.pop().split(';').shift();
+        }
+        return '';
+    };
+
+    const toggleButton = document.querySelector('[data-toggle-maintenance="true"]');
+    const toggleLabel = document.querySelector('[data-toggle-label]');
+
+    if (toggleButton && toggleLabel) {
+        toggleButton.addEventListener('click', async () => {
+            const url = toggleButton.dataset.toggleUrl;
+            const csrfToken = getCookie('csrftoken');
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': csrfToken,
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                });
+
+                if (!response.ok) {
+                    return;
+                }
+
+                const payload = await response.json();
+                const isEnabled = Boolean(payload.maintenance_mode);
+
+                toggleButton.classList.toggle('bg-indigo-600', isEnabled);
+                toggleButton.classList.toggle('bg-gray-300', !isEnabled);
+                toggleButton.setAttribute('aria-pressed', isEnabled ? 'true' : 'false');
+
+                const knob = toggleButton.querySelector('span.inline-block');
+                if (knob) {
+                    knob.classList.toggle('translate-x-6', isEnabled);
+                    knob.classList.toggle('translate-x-1', !isEnabled);
+                }
+
+                toggleLabel.textContent = isEnabled ? 'Enabled (ignore offline)' : 'Disabled';
+            } catch (error) {
+                // Silent failure for toggle request.
+            }
+        });
+    }
+</script>
 {% endblock %}

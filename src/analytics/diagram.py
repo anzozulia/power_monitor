@@ -372,15 +372,16 @@ class DiagramGenerator:
         path.push("Z")
         return path
 
-def generate_diagram_for_location(location: Location) -> BytesIO:
+def generate_diagram_for_location(location: Location, target_date: date | None = None) -> BytesIO:
     """
     Generate a weekly diagram for a location.
     
     Args:
         location: The location to generate diagram for
+        target_date: Date to anchor the weekly view (defaults to today)
     
     Returns:
         BytesIO containing the PNG image
     """
     generator = DiagramGenerator(location)
-    return generator.generate()
+    return generator.generate(target_date=target_date)

@@ -22,6 +22,7 @@ class LocationForm(forms.ModelForm):
             'telegram_chat_id',
             'alert_language',
             'alerting_enabled',
+            'is_offline_detection_disabled',
         ]
         widgets = {
             'name': forms.TextInput(attrs={
@@ -50,13 +51,17 @@ class LocationForm(forms.ModelForm):
             'alerting_enabled': forms.CheckboxInput(attrs={
                 'class': 'h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-600',
             }),
+            'is_offline_detection_disabled': forms.CheckboxInput(attrs={
+                'class': 'h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-600',
+            }),
         }
         help_texts = {
-            'heartbeat_period_seconds': 'How often the ESP32 will send heartbeats (in seconds). Minimum: 10',
+            'heartbeat_period_seconds': 'How often the device will send heartbeats (in seconds). Minimum: 10',
             'grace_period_seconds': 'Extra time to wait before marking as offline (in seconds). Minimum: 10',
             'telegram_bot_token': 'Bot token from @BotFather',
             'telegram_chat_id': 'Chat or channel ID for alerts (negative for groups)',
             'alert_language': 'Language used for Telegram alerts and diagram text.',
+            'is_offline_detection_disabled': 'Temporarily disable auto power-off when heartbeats time out.',
         }
     
     def clean_heartbeat_period_seconds(self):

@@ -24,5 +24,9 @@ urlpatterns = [
     path('admin/locations/<uuid:pk>/edit/', views.location_edit, name='location_edit'),
     path('admin/locations/<uuid:pk>/delete/', views.location_delete, name='location_delete'),
     path('admin/locations/<uuid:pk>/reset/', views.location_reset, name='location_reset'),
-    path('admin/locations/<uuid:pk>/config/', views.location_config, name='location_config'),
+    path(
+        'admin/locations/<uuid:pk>/toggle-offline-detection/',
+        views.location_toggle_offline_detection,
+        name='location_toggle_offline_detection',
+    ),
 ]

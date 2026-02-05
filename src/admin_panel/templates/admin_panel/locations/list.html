@@ -30,36 +30,38 @@
                                 Name
                             </th>
                             <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                                Status
+                                Status / Duration
                             </th>
                             <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                                Last Heartbeat
+                                Heartbeat Period
+                            </th>
+                            <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
+                                Grace Time
                             </th>
                             <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
                                 Alerting
-                            </th>
-                            <th scope="col" class="relative py-3.5 pl-3 pr-4 sm:pr-6">
-                                <span class="sr-only">Actions</span>
                             </th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-200 bg-white">
                         {% for location in locations %}
-                        <tr>
+                        <tr class="cursor-pointer hover:bg-gray-50"
+                            onclick="window.location.href='{% url 'admin_panel:location_detail' pk=location.pk %}'">
                             <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
-                                <a href="{% url 'admin_panel:location_detail' pk=location.pk %}" class="hover:text-indigo-600">
-                                    {{ location.name }}
-                                </a>
+                                {{ location.name }}
                             </td>
                             <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                                {% include "admin_panel/components/status_badge.html" with status=location.current_power_status is_monitoring=location.is_monitoring_active %}
-                            </td>
-                            <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                                {% if location.last_heartbeat_at %}
-                                    {{ location.last_heartbeat_at|timesince }} ago
+                                {% if location.last_status_change_at %}
+                                    {% include "admin_panel/components/status_badge.html" with status=location.current_power_status is_monitoring=location.is_monitoring_active duration_text=location.last_status_change_at|timesince %}
                                 {% else %}
-                                    Never
+                                    {% include "admin_panel/components/status_badge.html" with status=location.current_power_status is_monitoring=location.is_monitoring_active %}
                                 {% endif %}
+                            </td>
+                            <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                                {{ location.heartbeat_period_seconds }}s
+                            </td>
+                            <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                                {{ location.grace_period_seconds }}s
                             </td>
                             <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                                 {% if location.alerting_failed %}
@@ -75,17 +77,6 @@
                                         Disabled
                                     </span>
                                 {% endif %}
-                            </td>
-                            <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                                <a href="{% url 'admin_panel:location_config' pk=location.pk %}" class="text-indigo-600 hover:text-indigo-900 mr-4">
-                                    Config
-                                </a>
-                                <a href="{% url 'admin_panel:location_edit' pk=location.pk %}" class="text-indigo-600 hover:text-indigo-900 mr-4">
-                                    Edit
-                                </a>
-                                <a href="{% url 'admin_panel:location_delete' pk=location.pk %}" class="text-red-600 hover:text-red-900">
-                                    Delete
-                                </a>
                             </td>
                         </tr>
                         {% endfor %}
