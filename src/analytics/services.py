@@ -10,7 +10,6 @@ from typing import Optional
 
 from django.utils import timezone
 
-from core.i18n import get_diagram_caption
 from core.models import DiagramMessage, Location
 
 logger = logging.getLogger('analytics')
@@ -109,14 +108,10 @@ def send_and_pin_diagram(location: Location, diagram_bytes) -> Optional[DiagramM
     try:
         client = TelegramClient(location.telegram_bot_token)
         
-        # Send the photo
-        today = timezone.localdate()
-        caption_text = get_diagram_caption(location.alert_language)
-        caption = f"📊 {caption_text} - {location.name} ({today.strftime('%d.%m.%Y')})"
+        # Send the photo (no caption)
         message_id = client.send_photo(
             chat_id=location.telegram_chat_id,
             photo=diagram_bytes,
-            caption=caption,
         )
         
         # Pin the message
@@ -157,14 +152,10 @@ def send_diagram_without_pin(location: Location, diagram_bytes) -> Optional[int]
     try:
         client = TelegramClient(location.telegram_bot_token)
         
-        # Send the photo
-        today = timezone.localdate()
-        caption_text = get_diagram_caption(location.alert_language)
-        caption = f"📊 {caption_text} - {location.name} ({today.strftime('%d.%m.%Y')})"
+        # Send the photo (no caption)
         message_id = client.send_photo(
             chat_id=location.telegram_chat_id,
             photo=diagram_bytes,
-            caption=caption,
         )
         
         logger.info(f"Sent diagram (not pinned) for {location.name}")
