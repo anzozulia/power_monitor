@@ -7,9 +7,10 @@ Handles authentication and location CRUD operations.
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
+from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
 
-from core.models import Location
+from core.models import DiagramMessage, Heartbeat, Location, PowerEvent, PowerStatus
 
 from .forms import LocationForm
 
@@ -131,6 +132,40 @@ def location_delete(request, pk):
     return render(request, 'admin_panel/locations/detail.html', {
         'location': location,
         'confirm_delete': True,
+    })
+
+
+@login_required
+def location_reset(request, pk):
+    """Reset monitoring data for a location (keep configuration)."""
+    location = get_object_or_404(Location, pk=pk)
+
+    if request.method == 'POST':
+        with transaction.atomic():
+            Heartbeat.objects.filter(location=location).delete()
+            PowerEvent.objects.filter(location=location).delete()
+            DiagramMessage.objects.filter(location=location).delete()
+
+            location.monitoring_started_at = None
+            location.last_heartbeat_at = None
+            location.last_status_change_at = None
+            location.current_power_status = PowerStatus.UNKNOWN
+            location.save(update_fields=[
+                'monitoring_started_at',
+                'last_heartbeat_at',
+                'last_status_change_at',
+                'current_power_status',
+                'updated_at',
+            ])
+
+        messages.success(request, f'Location "{location.name}" data reset successfully.')
+        return redirect('admin_panel:location_detail', pk=location.pk)
+
+    recent_events = location.power_events.all()[:10]
+    return render(request, 'admin_panel/locations/detail.html', {
+        'location': location,
+        'recent_events': recent_events,
+        'confirm_reset': True,
     })
 
 
