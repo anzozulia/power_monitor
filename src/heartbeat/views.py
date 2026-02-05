@@ -1,0 +1,57 @@
+"""
+Heartbeat API Views
+
+Handles heartbeat reception from ESP32 devices.
+"""
+
+import json
+import logging
+
+from django.http import JsonResponse
+from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
+
+from core.models import Location
+
+from .authentication import authenticate_api_key
+
+logger = logging.getLogger('monitoring')
+
+
+@csrf_exempt
+@require_POST
+def heartbeat_view(request):
+    """
+    Receive heartbeat from ESP32 device.
+    
+    Expects X-API-Key header with location's API key.
+    Returns JSON response with status.
+    """
+    # Authenticate the request
+    location = authenticate_api_key(request)
+    
+    if location is None:
+        return JsonResponse({'error': 'invalid_api_key'}, status=401)
+    
+    # Check for duplicate heartbeat (within 5 seconds)
+    now = timezone.now()
+    if location.last_heartbeat_at:
+        time_since_last = (now - location.last_heartbeat_at).total_seconds()
+        if time_since_last < 5:
+            logger.debug(f"Duplicate heartbeat ignored for {location.name}")
+            return JsonResponse({
+                'status': 'duplicate_ignored',
+                'received_at': location.last_heartbeat_at.isoformat(),
+            })
+    
+    # Process the heartbeat
+    from monitoring.services import process_heartbeat
+    process_heartbeat(location, now)
+    
+    logger.info(f"Heartbeat received for {location.name}")
+    
+    return JsonResponse({
+        'status': 'ok',
+        'received_at': now.isoformat(),
+    })

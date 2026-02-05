@@ -1,0 +1,109 @@
+---
+alwaysApply: true
+---
+### Style & Conventions
+
+#### Language Standards
+- **Use Python** as the primary language
+- **Follow PEP8** coding standards consistently
+- **Use type hints** for function parameters and return values to improve code clarity
+- **Use lowercase with underscores** for directories and files (e.g., routers/user_routes.py)
+- **Use descriptive variable names** with auxiliary verbs (e.g., is_active, has_permission)
+
+#### Project Structure
+- **Prefer iteration and modularization** over code duplication
+- **Organize by feature modules** rather than technical layers when possible
+- **Create and use `__init__.py` files** when appropriate:
+  - Use in folders with large amount of functionality
+  - Use when the folder is imported in other parts of the project
+
+#### Import Organization
+- **Use the following imports order**:
+  1. **Standard library imports**
+  2. **Third-party imports**
+  3. **Application-specific imports**
+- **Within each block**: keep package-level imports before class/function imports
+
+**Example:**
+```python
+import os
+import sys
+
+import numpy
+import requests
+from datetime import datetime, timedelta
+
+from app_module_1 import app_function_1
+from app_module_2 import app_function_2
+```
+
+
+### Testing & Reliability
+
+#### Test Creation Requirements
+- **Always create unit tests for new features**:
+  - Functions, classes, API routes, etc.
+  - Write tests as you develop, not as an afterthought
+- **After updating any logic**: check whether existing unit tests need updates and modify them accordingly
+- **Run tests regularly** after each new significant feature or change
+
+#### Test Organization
+- **Tests should live in a `/tests` folder**
+- **Each test function should include at least**:
+  - **1 test for expected use**
+  - **1 edge case**
+  - **1 failure case**
+
+#### Test Quality Standards
+- **Use proper mocking** for external dependencies and APIs to ensure tests are isolated and fast
+- **Achieve at minimum 80% test coverage** for critical business logic
+
+
+### Security & Privacy
+
+#### Secrets Management
+- **Never hardcode secrets, API keys, or passwords** in your code
+- **Use environment variables** or secure configuration management
+
+#### Input Validation & Error Handling
+- **Validate all user inputs** before processing and sanitize input data
+- **Implement proper error handling** that doesn't expose sensitive information
+
+#### Dependency Management
+- **Avoid deprecated or unmaintained packages** whenever possible
+- **Review package sources** before adding new dependencies
+
+
+### Best Practices
+- **Use f-strings** for string formatting instead of `.format()` or `%` operator
+- **Prefer list/dict comprehensions** over traditional loops when appropriate
+- **Handle common exceptions specifically** instead of using bare `except:` clauses- handle at least the most common exceptions for use case before bare except
+- **Avoid unnecessary else statements** - use if-return pattern instead
+
+
+### Logging
+
+#### Logging Configuration
+- **Implement comprehensive file-based logging system** using Python's built-in `logging` module
+- **Configure multiple log levels**: DEBUG, INFO, WARNING, ERROR, CRITICAL
+- **Use structured logging format** with timestamps, log levels, module names, and messages
+- **All log files should be stored in `logs/` directory** with appropriate permissions
+
+#### Log Types & Content
+- **Error logging**: Include full stack traces and exception details for debugging
+- **Application events logging**: Track important business logic events, user actions, and system state changes
+- **Performance logging**: Monitor slow operations, database queries, and API response times
+- **Security logging**: Log authentication attempts, authorization failures, suspicious activities, etc.
+
+#### Log Management
+- **Implement log rotation**:
+  - Use `RotatingFileHandler`
+  - Set maximum file size (e.g., 10MB) and keep last 5-10 files
+  - Make logging settings configurable
+- **Use separate log files** for different log levels or components if/when necessary
+
+#### Logging Best Practices
+- **Never log sensitive information** like passwords, API keys, or personal data
+- **Use appropriate log levels**: reserve ERROR for actual problems, INFO for important events
+- **Include contextual information** in log messages (user IDs, request IDs, etc.)
+- **Configure logging early**- after main architecture initialization

@@ -1,0 +1,136 @@
+{% extends "admin_panel/base.html" %}
+
+{% block title %}{{ title }} - Power Monitor{% endblock %}
+
+{% block content %}
+<div class="md:flex md:items-center md:justify-between mb-8">
+    <div class="min-w-0 flex-1">
+        <h2 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-3xl sm:tracking-tight">
+            {{ title }}
+        </h2>
+    </div>
+</div>
+
+<div class="bg-white shadow sm:rounded-lg">
+    <form method="post" class="space-y-6 p-6">
+        {% csrf_token %}
+        
+        <!-- Name -->
+        <div>
+            <label for="id_name" class="block text-sm font-medium leading-6 text-gray-900">
+                Location Name
+            </label>
+            <div class="mt-2">
+                {{ form.name }}
+            </div>
+            {% if form.name.errors %}
+            <p class="mt-2 text-sm text-red-600">{{ form.name.errors.0 }}</p>
+            {% endif %}
+        </div>
+        
+        <!-- Heartbeat Configuration -->
+        <div class="border-t border-gray-200 pt-6">
+            <h3 class="text-base font-semibold leading-6 text-gray-900">Heartbeat Configuration</h3>
+            <p class="mt-1 text-sm text-gray-500">Configure how often your ESP32 will send heartbeats.</p>
+            
+            <div class="mt-4 grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+                <div>
+                    <label for="id_heartbeat_period_seconds" class="block text-sm font-medium leading-6 text-gray-900">
+                        Heartbeat Period (seconds)
+                    </label>
+                    <div class="mt-2">
+                        {{ form.heartbeat_period_seconds }}
+                    </div>
+                    <p class="mt-1 text-sm text-gray-500">{{ form.heartbeat_period_seconds.help_text }}</p>
+                    {% if form.heartbeat_period_seconds.errors %}
+                    <p class="mt-2 text-sm text-red-600">{{ form.heartbeat_period_seconds.errors.0 }}</p>
+                    {% endif %}
+                </div>
+                
+                <div>
+                    <label for="id_grace_period_seconds" class="block text-sm font-medium leading-6 text-gray-900">
+                        Grace Period (seconds)
+                    </label>
+                    <div class="mt-2">
+                        {{ form.grace_period_seconds }}
+                    </div>
+                    <p class="mt-1 text-sm text-gray-500">{{ form.grace_period_seconds.help_text }}</p>
+                    {% if form.grace_period_seconds.errors %}
+                    <p class="mt-2 text-sm text-red-600">{{ form.grace_period_seconds.errors.0 }}</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Telegram Configuration -->
+        <div class="border-t border-gray-200 pt-6">
+            <h3 class="text-base font-semibold leading-6 text-gray-900">Telegram Configuration</h3>
+            <p class="mt-1 text-sm text-gray-500">Configure Telegram bot for alerts.</p>
+            
+            <div class="mt-4 grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+                <div>
+                    <label for="id_telegram_bot_token" class="block text-sm font-medium leading-6 text-gray-900">
+                        Bot Token
+                    </label>
+                    <div class="mt-2">
+                        {{ form.telegram_bot_token }}
+                    </div>
+                    <p class="mt-1 text-sm text-gray-500">{{ form.telegram_bot_token.help_text }}</p>
+                    {% if form.telegram_bot_token.errors %}
+                    <p class="mt-2 text-sm text-red-600">{{ form.telegram_bot_token.errors.0 }}</p>
+                    {% endif %}
+                </div>
+                
+                <div>
+                    <label for="id_telegram_chat_id" class="block text-sm font-medium leading-6 text-gray-900">
+                        Chat/Channel ID
+                    </label>
+                    <div class="mt-2">
+                        {{ form.telegram_chat_id }}
+                    </div>
+                    <p class="mt-1 text-sm text-gray-500">{{ form.telegram_chat_id.help_text }}</p>
+                    {% if form.telegram_chat_id.errors %}
+                    <p class="mt-2 text-sm text-red-600">{{ form.telegram_chat_id.errors.0 }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="mt-4">
+                <label for="id_alert_language" class="block text-sm font-medium leading-6 text-gray-900">
+                    Alert Language
+                </label>
+                <div class="mt-2">
+                    {{ form.alert_language }}
+                </div>
+                <p class="mt-1 text-sm text-gray-500">{{ form.alert_language.help_text }}</p>
+                {% if form.alert_language.errors %}
+                <p class="mt-2 text-sm text-red-600">{{ form.alert_language.errors.0 }}</p>
+                {% endif %}
+            </div>
+            
+            <div class="mt-4">
+                <div class="relative flex items-start">
+                    <div class="flex h-6 items-center">
+                        {{ form.alerting_enabled }}
+                    </div>
+                    <div class="ml-3 text-sm leading-6">
+                        <label for="id_alerting_enabled" class="font-medium text-gray-900">Enable Alerting</label>
+                        <p class="text-gray-500">Send Telegram notifications when power status changes.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Form Actions -->
+        <div class="border-t border-gray-200 pt-6 flex items-center justify-end gap-x-6">
+            <a href="{% url 'admin_panel:location_list' %}" class="text-sm font-semibold leading-6 text-gray-900">
+                Cancel
+            </a>
+            <button type="submit"
+                    class="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">
+                {{ submit_text }}
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

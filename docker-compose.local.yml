@@ -1,0 +1,71 @@
+# Power Outage Monitor - Local Development Configuration
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: power_monitor_postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-power_monitor}
+      POSTGRES_USER: ${POSTGRES_USER:-power_monitor}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-localdev}
+    volumes:
+      - ./docker_data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-power_monitor}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - power_monitor_network
+
+  # Django Web Application
+  app:
+    build:
+      context: .
+      target: development
+    container_name: power_monitor_app
+    env_file:
+      - .env.docker_local
+    environment:
+      - POSTGRES_HOST=postgres
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./src:/app/src
+      - ./scripts:/app/scripts
+      - ./logs:/app/logs
+      - ./test_output:/app/test_output
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - power_monitor_network
+
+  # Background Task Worker
+  worker:
+    build:
+      context: .
+      target: development
+    container_name: power_monitor_worker
+    env_file:
+      - .env.docker_local
+    environment:
+      - POSTGRES_HOST=postgres
+    entrypoint: ["./scripts/worker.sh"]
+    command: []
+    volumes:
+      - ./src:/app/src
+      - ./scripts:/app/scripts
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      app:
+        condition: service_started
+    networks:
+      - power_monitor_network
+
+networks:
+  power_monitor_network:
+    driver: bridge

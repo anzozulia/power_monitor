@@ -1,0 +1,53 @@
+# Git
+.git
+.gitignore
+
+# Docker
+docker-compose*.yml
+Dockerfile*
+.dockerignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv
+venv
+ENV
+env
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs and data
+logs/
+docker_data/
+backups/
+*.log
+
+# Environment files
+.env*
+!.env.example
+
+# Specs and docs
+specs/
+.specify/
+.cursor/
+*.md
+
+# Node (Tailwind)
+node_modules/
+
+# Coverage
+htmlcov/
+.coverage
+.pytest_cache/

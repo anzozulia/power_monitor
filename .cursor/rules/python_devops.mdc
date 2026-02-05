@@ -1,0 +1,106 @@
+---
+alwaysApply: true
+---
+### Python Development & Deployment Standards
+
+#### Core Development Principles
+- **Maintain configuration flexibility** - seamlessly switch between docker local and production environments
+- **Use environment-based configuration** - all main settings controlled via .env files
+- **Follow containerization best practices** - separate containers for different services
+- **Ensure data persistence** - mount sensitive data in organized directory structure to docker_data/ dir
+
+
+### Environment Configuration Management
+
+#### Environment Files Structure
+- **`.env.example`** - Template with all required variables (committed to git)
+- **`.env.docker_local`** - Local Docker environment configuration (gitignored)
+- **`.env.docker_production`** - Production Docker configuration (gitignored)
+- **All .env files should be as similar as possible** - only essential differences between environments
+
+#### Configuration Loading Priority
+1. **Environment-specific .env file** (highest priority)
+2. **System environment variables**
+3. **Default application settings** (lowest priority)
+
+
+### Docker Architecture & Configuration
+
+#### Multi-Container Architecture
+- **Python Application Container** - main application logic
+- **PostgreSQL Container** - production database
+- **Others** - if needed
+- **Each service in separate container** - promotes modularity and scalability
+- **Docker internal networking** - containers communicate via internal network
+- **Only main app exposes ports** - unless other services specifically need external access
+
+#### Docker Configuration Files
+- **`Dockerfile`** - Single Dockerfile with multi-stage builds for different environments
+- **`docker-compose.local.yml`** - Local Docker development configuration
+- **`docker-compose.prod.yml`** - Production Docker configuration
+- **`.dockerignore`** - Exclude unnecessary files from Docker context
+
+#### Build Strategy & Image Management
+- **No pre-built images** - never create or maintain pre-built application images
+- **Dockerfile as build context only** - use Dockerfile solely for defining build instructions
+- **Build on demand** - images built during docker-compose up or docker build commands
+- **Fresh builds for deployment** - each deployment builds from source using Dockerfile
+- **No image registry for application** - only use registries for base images (python, postgres, redis)
+- **Source code as truth** - application images always built from current source state
+- **Multi-stage builds** - single Dockerfile with different targets for different environments
+- **Build caching optimization** - structure Dockerfile to maximize Docker layer caching
+- **Consistent build process** - same Dockerfile used across all environments with different targets
+
+
+### Data Persistence & Storage
+
+#### Docker Data Organization
+```
+project_root/
+├── docker_data/
+│   ├── postgres/        # PostgreSQL data
+│   └── redis/           # Redis data (for example, if needed)
+├── backups/             # Database backups
+```
+
+#### Data Volume Management
+- **All persistent containers data mounted in docker_data/** - organized by service
+- **Backup strategy** - regular database dumps to backups/ with appropriate rotation
+
+
+### Security & Best Practices
+
+#### Environment Security
+- **Never commit .env files** - add to .gitignore
+- **Use strong passwords** in production environments
+- **Rotate secrets regularly** - especially for production
+- **Validate environment variables** - ensure required variables are set
+
+#### Docker Security
+- **Use specific image tags** - avoid 'latest' tags
+- **Minimal base images** - use slim or alpine variants
+
+#### Network Security
+- **Internal Docker networking** - services communicate via internal network
+- **Expose only necessary ports** - main application port only at best
+- **No nginx configuration in application** - handled at server level
+
+
+### Development Workflow
+
+#### Docker Development Flow Examples
+1. **Start services with automatic build** - `docker-compose -f docker-compose.local.yml up -d` (builds images automatically)
+2. **Run migrations** - `docker-compose -f docker-compose.local.yml exec app python manage.py migrate`
+3. **Access application** - http://localhost:8000
+4. **Force rebuild if needed** - `docker-compose -f docker-compose.local.yml up -d --build` (for dependency changes)
+
+#### Production Deployment Flow Examples
+1. **Deploy with automatic build** - `docker-compose -f docker-compose.prod.yml up -d` (builds fresh from source)
+2. **Run production migrations** - `docker-compose -f docker-compose.prod.yml exec app python manage.py migrate`
+3. **Verify deployment** - check application health and functionality
+4. **Force rebuild if needed** - `docker-compose -f docker-compose.prod.yml up -d --build` (for clean rebuild)
+
+#### Configuration Switching
+- **No code changes required** - only environment file differences whenever possible
+- **Seamless environment switching** - change environment file, restart application
+- **Consistent application behavior** - same codebase across all environments

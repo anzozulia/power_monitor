@@ -1,0 +1,23 @@
+# Power Outage Monitor - Python Dependencies
+
+# Web Framework
+Django>=6.0,<7.0
+
+# Database
+psycopg[binary]>=3.1
+
+# Telegram Bot
+python-telegram-bot>=21.0
+
+# Diagram Generation
+svgwrite>=1.4
+cairosvg>=2.7
+
+# Production Server
+gunicorn>=21.0
+
+# CSS Framework
+django-tailwind>=3.8
+
+# Environment Variables
+python-dotenv>=1.0

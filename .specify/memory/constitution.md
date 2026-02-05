@@ -1,50 +1,62 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+<!-- Sync Impact Report
+Version change: N/A -> 0.1.0
+Modified principles: None (initial draft with placeholders)
+Added sections: Core Principles, Additional Constraints, Development Workflow, Governance
+Removed sections: None
+Templates requiring updates:
+- .specify/templates/plan-template.md ✅ no changes required
+- .specify/templates/spec-template.md ✅ no changes required
+- .specify/templates/tasks-template.md ✅ no changes required
+- .specify/templates/checklist-template.md ✅ no changes required
+- .specify/templates/agent-file-template.md ✅ no changes required
+- .specify/templates/commands/*.md ⚠ none found
+Runtime guidance docs:
+- README.md ⚠ not found
+Follow-up TODOs:
+- TODO(PROJECT_NAME): confirm project name
+- TODO(RATIFICATION_DATE): ratification date unknown
+- TODO(PRINCIPLES): define non-negotiable principles before use
+- TODO(SECTION_2): define additional constraints
+- TODO(SECTION_3): define workflow and quality gates
+- TODO(GOVERNANCE_RULES): confirm amendment process details
+-->
+# Power Monitor Constitution
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### Placeholder Principle 1 (UNDEFINED)
+TODO(PRINCIPLE_1_DESCRIPTION): Define a non-negotiable rule and rationale. Until
+defined, teams MUST NOT assume any requirement from this placeholder.
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+### Placeholder Principle 2 (UNDEFINED)
+TODO(PRINCIPLE_2_DESCRIPTION): Define a non-negotiable rule and rationale. Until
+defined, teams MUST NOT assume any requirement from this placeholder.
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+### Placeholder Principle 3 (UNDEFINED)
+TODO(PRINCIPLE_3_DESCRIPTION): Define a non-negotiable rule and rationale. Until
+defined, teams MUST NOT assume any requirement from this placeholder.
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+### Placeholder Principle 4 (UNDEFINED)
+TODO(PRINCIPLE_4_DESCRIPTION): Define a non-negotiable rule and rationale. Until
+defined, teams MUST NOT assume any requirement from this placeholder.
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### Placeholder Principle 5 (UNDEFINED)
+TODO(PRINCIPLE_5_DESCRIPTION): Define a non-negotiable rule and rationale. Until
+defined, teams MUST NOT assume any requirement from this placeholder.
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+## Additional Constraints (UNDEFINED)
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+TODO(SECTION_2_CONTENT): Define security, performance, compliance, or platform
+constraints. Until defined, no extra constraints apply beyond core principles.
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+## Development Workflow (UNDEFINED)
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+TODO(SECTION_3_CONTENT): Define review process, testing gates, and release
+requirements. Until defined, teams MUST document workflow decisions in plan.md.
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+TODO(GOVERNANCE_RULES): Define amendment approvals and compliance checks. Until
+defined, amendments MUST update this file, bump the version, and record dates.
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+**Version**: 0.1.0 | **Ratified**: TODO(RATIFICATION_DATE: unknown) | **Last Amended**: 2026-02-04
