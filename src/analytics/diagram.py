@@ -233,7 +233,7 @@ class DiagramGenerator:
         if not self.location.monitoring_started_at:
             return [(0, 24, 'no_data')]
         
-        monitoring_start = self.location.monitoring_started_at.date()
+        monitoring_start = timezone.localtime(self.location.monitoring_started_at).date()
         if day_date < monitoring_start:
             return [(0, 24, 'no_data')]
         
@@ -272,7 +272,12 @@ class DiagramGenerator:
         current_hour = 0.0
         
         for event in events:
-            event_hour = event.occurred_at.hour + event.occurred_at.minute / 60.0
+            event_local = timezone.localtime(event.occurred_at)
+            event_hour = (
+                event_local.hour
+                + event_local.minute / 60.0
+                + event_local.second / 3600.0
+            )
             
             if event_hour > current_hour:
                 segments.append((current_hour, event_hour, current_status))
