@@ -41,15 +41,16 @@ class Command(BaseCommand):
         last_daily_run = None
         
         # Avoid running daily diagrams on boot before midnight hour
-        if timezone.now().hour != 0:
-            last_daily_run = timezone.now().date()
+        local_now = timezone.localtime()
+        if local_now.hour != 0:
+            last_daily_run = local_now.date()
 
         # Run initial heartbeat check immediately
         self._run_heartbeat_check()
         
         while self.running:
             try:
-                now = timezone.now()
+                now = timezone.localtime()
                 current_hour = now.hour
                 current_date = now.date()
                 current_minute = now.minute
