@@ -21,6 +21,10 @@
            class="inline-flex items-center rounded-md bg-amber-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-amber-500">
             Reset Data
         </a>
+        <a href="{% url 'admin_panel:location_delete' pk=location.pk %}"
+           class="inline-flex items-center rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500">
+            Delete
+        </a>
     </div>
 </div>
 
