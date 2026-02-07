@@ -85,6 +85,13 @@ class Location(models.Model):
         default=False,
         help_text="Disable auto power-off when heartbeat timeout exceeds grace period.",
     )
+    is_router_reconnect_window_enabled = models.BooleanField(
+        default=False,
+        help_text=(
+            "Enable a router reconnect window after power-on "
+            "(5 minutes window + 3 minutes extra grace)."
+        ),
+    )
     
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)

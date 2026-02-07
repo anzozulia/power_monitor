@@ -14,6 +14,9 @@ from core.models import EventType, Heartbeat, Location, PowerEvent, PowerStatus
 
 logger = logging.getLogger('monitoring')
 
+ROUTER_RECONNECT_WINDOW_SECONDS = 5 * 60
+ROUTER_RECONNECT_GRACE_SECONDS = 3 * 60
+
 
 def process_heartbeat(location: Location, received_at: Optional[datetime] = None) -> None:
     """
@@ -139,9 +142,33 @@ def _is_location_timed_out(location: Location, now: datetime) -> bool:
     """Check if a location has exceeded its timeout threshold."""
     if not location.last_heartbeat_at:
         return False
-    
+
     elapsed = (now - location.last_heartbeat_at).total_seconds()
-    return elapsed > location.timeout_seconds
+    timeout_seconds = location.timeout_seconds
+
+    if _should_apply_router_reconnect_grace(location):
+        timeout_seconds += ROUTER_RECONNECT_GRACE_SECONDS
+
+    return elapsed > timeout_seconds
+
+
+def _should_apply_router_reconnect_grace(location: Location) -> bool:
+    """
+    Apply extra grace if heartbeats stopped during the first power-on window.
+
+    This handles router reconnects after power restoration for locations without UPS.
+    """
+    if not location.is_router_reconnect_window_enabled:
+        return False
+    if location.current_power_status != PowerStatus.ON:
+        return False
+    if not location.last_status_change_at or not location.last_heartbeat_at:
+        return False
+
+    elapsed_since_on = (
+        location.last_heartbeat_at - location.last_status_change_at
+    ).total_seconds()
+    return elapsed_since_on <= ROUTER_RECONNECT_WINDOW_SECONDS
 
 
 def _handle_power_outage(location: Location, detected_at: datetime) -> None:

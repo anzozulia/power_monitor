@@ -23,6 +23,7 @@ class LocationForm(forms.ModelForm):
             'alert_language',
             'alerting_enabled',
             'is_offline_detection_disabled',
+            'is_router_reconnect_window_enabled',
         ]
         widgets = {
             'name': forms.TextInput(attrs={
@@ -54,6 +55,9 @@ class LocationForm(forms.ModelForm):
             'is_offline_detection_disabled': forms.CheckboxInput(attrs={
                 'class': 'h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-600',
             }),
+            'is_router_reconnect_window_enabled': forms.CheckboxInput(attrs={
+                'class': 'h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-600',
+            }),
         }
         help_texts = {
             'heartbeat_period_seconds': 'How often the device will send heartbeats (in seconds). Minimum: 10',
@@ -62,6 +66,10 @@ class LocationForm(forms.ModelForm):
             'telegram_chat_id': 'Chat or channel ID for alerts (negative for groups)',
             'alert_language': 'Language used for Telegram alerts and diagram text.',
             'is_offline_detection_disabled': 'Temporarily disable auto power-off when heartbeats time out.',
+            'is_router_reconnect_window_enabled': (
+                'Enable a router reconnect window after power-on '
+                '(5 minutes window + 3 minutes extra grace).'
+            ),
         }
     
     def clean_heartbeat_period_seconds(self):

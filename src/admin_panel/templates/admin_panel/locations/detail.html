@@ -81,6 +81,16 @@
                 <dd class="mt-1 text-sm text-gray-900">{{ location.grace_period_seconds }} seconds</dd>
             </div>
             <div>
+                <dt class="text-sm font-medium text-gray-500">Router Reconnect Window</dt>
+                <dd class="mt-1 text-sm text-gray-900">
+                    {% if location.is_router_reconnect_window_enabled %}
+                        Enabled (5 min window + 3 min extra grace)
+                    {% else %}
+                        Disabled
+                    {% endif %}
+                </dd>
+            </div>
+            <div>
                 <dt class="text-sm font-medium text-gray-500">Heartbeat Endpoint</dt>
                 <dd class="mt-1 text-sm text-gray-900">
                     <code class="bg-gray-100 px-2 py-1 rounded font-mono text-sm break-all">{{ endpoint_url_with_key }}</code>
