@@ -188,3 +188,46 @@ def location_toggle_offline_detection(request, pk):
         })
 
     return JsonResponse({'detail': 'Method not allowed.'}, status=405)
+
+
+@login_required
+def power_event_delete(request, pk, event_id):
+    """Delete a power event for a location."""
+    event = get_object_or_404(PowerEvent, id=event_id, location_id=pk)
+
+    if request.method == 'POST':
+        with transaction.atomic():
+            previous_event = (
+                PowerEvent.objects.filter(
+                    location_id=pk,
+                    occurred_at__lt=event.occurred_at,
+                )
+                .order_by('-occurred_at')
+                .first()
+            )
+            next_event = (
+                PowerEvent.objects.filter(
+                    location_id=pk,
+                    occurred_at__gt=event.occurred_at,
+                )
+                .order_by('occurred_at')
+                .first()
+            )
+
+            event.delete()
+
+            if next_event:
+                if previous_event:
+                    duration = next_event.occurred_at - previous_event.occurred_at
+                    next_event.previous_state_duration_seconds = int(
+                        duration.total_seconds()
+                    )
+                else:
+                    next_event.previous_state_duration_seconds = None
+                next_event.save(update_fields=[
+                    'previous_state_duration_seconds',
+                    'updated_at',
+                ])
+
+        messages.success(request, 'Power event deleted and durations recalculated.')
+    return redirect('admin_panel:location_detail', pk=pk)
