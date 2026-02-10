@@ -23,7 +23,7 @@ def process_heartbeat(location: Location, received_at: Optional[datetime] = None
     Process a heartbeat from a device.
     
     Handles:
-    - Recording only state-switch heartbeats
+    - Recording every heartbeat
     - Starting monitoring on first heartbeat
     - Detecting power restoration after outage
     
@@ -34,17 +34,15 @@ def process_heartbeat(location: Location, received_at: Optional[datetime] = None
     if received_at is None:
         received_at = timezone.now()
     
-    # Record only the first heartbeat after power on.
-    # Regular heartbeats update timestamps but are not stored in DB.
+    Heartbeat.objects.create(location=location, received_at=received_at)
+
     # Check if this is the first heartbeat (start monitoring)
     if not location.is_monitoring_active:
-        Heartbeat.objects.create(location=location, received_at=received_at)
         _start_monitoring(location, received_at)
         return
     
     # Check if this is a power restoration (was off, now getting heartbeats)
     if location.current_power_status == PowerStatus.OFF:
-        Heartbeat.objects.create(location=location, received_at=received_at)
         _handle_power_restoration(location, received_at)
     
     # Update last heartbeat timestamp
@@ -107,7 +105,12 @@ def _handle_power_restoration(location: Location, restored_at: datetime) -> None
     # Trigger alert
     if location.alerting_enabled and not location.alerting_failed:
         from monitoring.tasks import send_alert
-        send_alert(location.id, event.id)
+        send_alert(
+            location.id,
+            EventType.POWER_ON,
+            duration_seconds,
+            event_id=event.id,
+        )
 
 
 def check_all_locations_for_outages() -> int:
@@ -212,7 +215,12 @@ def _handle_power_outage(location: Location, detected_at: datetime) -> None:
     # Trigger alert
     if location.alerting_enabled and not location.alerting_failed:
         from monitoring.tasks import send_alert
-        send_alert(location.id, event.id)
+        send_alert(
+            location.id,
+            EventType.POWER_OFF,
+            duration_seconds,
+            event_id=event.id,
+        )
 
 
 def recover_from_restart() -> None:
@@ -255,36 +263,3 @@ def recover_from_restart() -> None:
                 )
 
 
-def cleanup_non_valuable_heartbeats() -> int:
-    """
-    Remove heartbeats that are not tied to power state transitions.
-
-    Keeps heartbeats that match power event timestamps and key state markers.
-    """
-    deleted_count = 0
-    locations = Location.objects.all()
-
-    for location in locations:
-        important_times = list(
-            PowerEvent.objects.filter(location=location)
-            .values_list('occurred_at', flat=True)
-        )
-        if location.monitoring_started_at:
-            important_times.append(location.monitoring_started_at)
-        if location.last_status_change_at:
-            important_times.append(location.last_status_change_at)
-
-        if not important_times:
-            continue
-
-        deleted, _ = (
-            Heartbeat.objects.filter(location=location)
-            .exclude(received_at__in=important_times)
-            .delete()
-        )
-        deleted_count += deleted
-
-    if deleted_count:
-        logger.info("Deleted %s non-valuable heartbeats on startup.", deleted_count)
-
-    return deleted_count

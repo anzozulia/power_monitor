@@ -14,7 +14,11 @@ import svgwrite
 from django.utils import timezone
 
 from core.i18n import get_diagram_strings
-from core.models import EventType, Location, PowerEvent, PowerStatus
+from core.models import Heartbeat, Location
+from monitoring.services import (
+    ROUTER_RECONNECT_GRACE_SECONDS,
+    ROUTER_RECONNECT_WINDOW_SECONDS,
+)
 
 logger = logging.getLogger('analytics')
 
@@ -237,74 +241,142 @@ class DiagramGenerator:
         if day_date < monitoring_start:
             return [(0, 24, 'no_data')]
         
-        # Get events for this day
+        # Get heartbeats for this day
         day_start = timezone.make_aware(datetime.combine(day_date, datetime.min.time()))
         day_end = day_start + timedelta(days=1)
         
-        events = list(PowerEvent.objects.filter(
-            location=self.location,
-            occurred_at__gte=day_start,
-            occurred_at__lt=day_end,
-        ).order_by('occurred_at'))
-        
-        # Determine initial status at start of day
-        # Find the most recent event before this day
-        prev_event = PowerEvent.objects.filter(
-            location=self.location,
-            occurred_at__lt=day_start,
-        ).order_by('-occurred_at').first()
-        
-        if prev_event:
-            # Status is opposite of what the previous event set
-            if prev_event.event_type == EventType.POWER_ON:
-                current_status = 'on'
-            else:
-                current_status = 'off'
-        elif day_date == monitoring_start:
-            # First day of monitoring - no data until first heartbeat
-            current_status = 'no_data'
-        else:
-            # Default to no data
-            current_status = 'no_data'
-        
-        # Build segments
-        segments = []
-        current_hour = 0.0
-        
-        for event in events:
-            event_local = timezone.localtime(event.occurred_at)
-            event_hour = (
-                event_local.hour
-                + event_local.minute / 60.0
-                + event_local.second / 3600.0
+        heartbeats = list(
+            Heartbeat.objects.filter(
+                location=self.location,
+                received_at__gte=day_start,
+                received_at__lt=day_end,
             )
-            
-            if event_hour > current_hour:
-                segments.append((current_hour, event_hour, current_status))
-            
-            # Update status based on event
-            if event.event_type == EventType.POWER_ON:
-                current_status = 'on'
-            else:
-                current_status = 'off'
-            
-            current_hour = event_hour
-        
-        # Add final segment to end of day
-        if current_hour < 24:
-            # For today, only go up to current hour
+            .order_by('received_at')
+            .values_list('received_at', flat=True)
+        )
+        prev_heartbeat = (
+            Heartbeat.objects.filter(
+                location=self.location,
+                received_at__lt=day_start,
+            )
+            .order_by('-received_at')
+            .values_list('received_at', flat=True)
+            .first()
+        )
+        next_heartbeat = (
+            Heartbeat.objects.filter(
+                location=self.location,
+                received_at__gte=day_end,
+            )
+            .order_by('received_at')
+            .values_list('received_at', flat=True)
+            .first()
+        )
+
+        timeline = []
+        if prev_heartbeat:
+            timeline.append(prev_heartbeat)
+        timeline.extend(heartbeats)
+        if next_heartbeat:
+            timeline.append(next_heartbeat)
+
+        # Build intervals from heartbeats
+        intervals = []
+        timeout_seconds = self.location.timeout_seconds
+        if timeline:
+            on_started_at = timeline[0]
+            for idx in range(len(timeline) - 1):
+                start = timeline[idx]
+                end = timeline[idx + 1]
+                effective_timeout = timeout_seconds
+                if self._use_router_reconnect_grace(start, on_started_at):
+                    effective_timeout += ROUTER_RECONNECT_GRACE_SECONDS
+                status = (
+                    'on'
+                    if (end - start).total_seconds() <= effective_timeout
+                    else 'off'
+                )
+                intervals.append((start, end, status))
+                if status == 'off':
+                    on_started_at = end
+
+            end_limit = day_end
             today = timezone.localdate()
             if day_date == today:
                 now = timezone.localtime()
-                end_hour = now.hour + now.minute / 60.0
-                if end_hour > current_hour:
-                    segments.append((current_hour, end_hour, current_status))
-                if end_hour < 24:
-                    segments.append((end_hour, 24, 'no_data'))
-            else:
-                segments.append((current_hour, 24, current_status))
-        
+                if now < day_end:
+                    end_limit = now
+
+            last_time = timeline[-1]
+            if last_time < end_limit:
+                effective_timeout = timeout_seconds
+                if self._use_router_reconnect_grace(last_time, on_started_at):
+                    effective_timeout += ROUTER_RECONNECT_GRACE_SECONDS
+                status = (
+                    'on'
+                    if (end_limit - last_time).total_seconds() <= effective_timeout
+                    else 'off'
+                )
+                intervals.append((last_time, end_limit, status))
+        else:
+            end_limit = day_end
+            if day_date == timezone.localdate():
+                now = timezone.localtime()
+                if now < day_end:
+                    end_limit = now
+
+        # Build segments for the day
+        segments = []
+        cursor = day_start
+
+        def add_segment(start_dt: datetime, end_dt: datetime, status: str) -> None:
+            start_hour = self._to_day_hour(start_dt)
+            end_hour = self._to_day_hour(end_dt)
+            if end_hour <= start_hour:
+                return
+            if segments and segments[-1][2] == status and abs(segments[-1][1] - start_hour) < 0.0001:
+                segments[-1] = (segments[-1][0], end_hour, status)
+                return
+            segments.append((start_hour, end_hour, status))
+
+        for start, end, status in intervals:
+            if end <= day_start:
+                continue
+            if start >= end_limit:
+                break
+            seg_start = max(start, day_start)
+            seg_end = min(end, end_limit)
+            if seg_start > cursor:
+                add_segment(cursor, seg_start, 'no_data')
+            add_segment(seg_start, seg_end, status)
+            cursor = max(cursor, seg_end)
+
+        if cursor < end_limit:
+            add_segment(cursor, end_limit, 'no_data')
+
+        if day_date == timezone.localdate() and end_limit < day_end:
+            add_segment(end_limit, day_end, 'no_data')
+
         return segments if segments else [(0, 24, 'no_data')]
+
+    @staticmethod
+    def _to_day_hour(timestamp: datetime) -> float:
+        local_time = timezone.localtime(timestamp)
+        return (
+            local_time.hour
+            + local_time.minute / 60.0
+            + local_time.second / 3600.0
+        )
+
+    def _use_router_reconnect_grace(
+        self,
+        heartbeat_time: datetime,
+        on_started_at: datetime,
+    ) -> bool:
+        if not self.location.is_router_reconnect_window_enabled:
+            return False
+        elapsed = (heartbeat_time - on_started_at).total_seconds()
+        return elapsed <= ROUTER_RECONNECT_WINDOW_SECONDS
 
     def _get_color(self, status: str, is_current_week: bool) -> str:
         """Get the color for a status, with dimming for previous week."""

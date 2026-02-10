@@ -19,13 +19,28 @@ def format_power_event_alert(location: Location, event: PowerEvent) -> str:
     Returns:
         HTML-formatted message string
     """
-    if event.event_type == EventType.POWER_OFF:
-        return format_power_off_alert(location, event)
-    else:
-        return format_power_on_alert(location, event)
+    return format_power_status_alert(
+        location,
+        event.event_type,
+        event.previous_state_duration_seconds,
+    )
 
 
-def format_power_off_alert(location: Location, event: PowerEvent) -> str:
+def format_power_status_alert(
+    location: Location,
+    event_type: EventType,
+    previous_state_duration_seconds: int | None,
+) -> str:
+    """Format a power status alert from heartbeat-derived data."""
+    if event_type == EventType.POWER_OFF:
+        return format_power_off_alert(location, previous_state_duration_seconds)
+    return format_power_on_alert(location, previous_state_duration_seconds)
+
+
+def format_power_off_alert(
+    location: Location,
+    previous_state_duration_seconds: int | None,
+) -> str:
     """
     Format a power outage alert.
     
@@ -35,7 +50,7 @@ def format_power_off_alert(location: Location, event: PowerEvent) -> str:
     Power was ON for: 5h 23m
     """
     strings = get_alert_strings(location.alert_language)
-    duration_text = _format_duration(event.previous_state_duration_seconds, strings)
+    duration_text = _format_duration(previous_state_duration_seconds, strings)
 
     message = f"🔴 <b>{strings['power_off']}</b>\n"
 
@@ -45,7 +60,10 @@ def format_power_off_alert(location: Location, event: PowerEvent) -> str:
     return message
 
 
-def format_power_on_alert(location: Location, event: PowerEvent) -> str:
+def format_power_on_alert(
+    location: Location,
+    previous_state_duration_seconds: int | None,
+) -> str:
     """
     Format a power restoration alert.
     
@@ -55,7 +73,7 @@ def format_power_on_alert(location: Location, event: PowerEvent) -> str:
     Power was OFF for: 3h 15m
     """
     strings = get_alert_strings(location.alert_language)
-    duration_text = _format_duration(event.previous_state_duration_seconds, strings)
+    duration_text = _format_duration(previous_state_duration_seconds, strings)
 
     message = f"🟢 <b>{strings['power_on']}</b>\n"
 

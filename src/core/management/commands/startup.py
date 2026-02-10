@@ -22,9 +22,8 @@ class Command(BaseCommand):
         
         self.stdout.write('Running startup recovery...')
         
-        from monitoring.services import cleanup_non_valuable_heartbeats, recover_from_restart
+        from monitoring.services import recover_from_restart
         recover_from_restart()
-        cleanup_non_valuable_heartbeats()
         
         self.stdout.write(
             self.style.SUCCESS('Startup recovery complete')

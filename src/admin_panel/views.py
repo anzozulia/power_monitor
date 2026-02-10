@@ -4,12 +4,15 @@ Admin Panel Views
 Handles authentication and location CRUD operations.
 """
 
+from datetime import timedelta
+
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 
 from core.models import DiagramMessage, Heartbeat, Location, PowerEvent, PowerStatus
 
@@ -197,6 +200,7 @@ def power_event_delete(request, pk, event_id):
 
     if request.method == 'POST':
         with transaction.atomic():
+            location = event.location
             previous_event = (
                 PowerEvent.objects.filter(
                     location_id=pk,
@@ -214,6 +218,12 @@ def power_event_delete(request, pk, event_id):
                 .first()
             )
 
+            _adjust_heartbeats_for_deleted_event(
+                location=location,
+                event=event,
+                previous_event=previous_event,
+                next_event=next_event,
+            )
             event.delete()
 
             if next_event:
@@ -229,5 +239,88 @@ def power_event_delete(request, pk, event_id):
                     'updated_at',
                 ])
 
+            _recalculate_location_heartbeat_state(location)
+
         messages.success(request, 'Power event deleted and durations recalculated.')
     return redirect('admin_panel:location_detail', pk=pk)
+
+
+def _adjust_heartbeats_for_deleted_event(
+    location: Location,
+    event: PowerEvent,
+    previous_event: PowerEvent | None,
+    next_event: PowerEvent | None,
+) -> None:
+    """Adjust heartbeats so power events reflect heartbeat-derived truth."""
+    if event.event_type == 'power_off':
+        prev_heartbeat = (
+            Heartbeat.objects.filter(
+                location=location,
+                received_at__lt=event.occurred_at,
+            )
+            .order_by('-received_at')
+            .first()
+        )
+        next_heartbeat = (
+            Heartbeat.objects.filter(
+                location=location,
+                received_at__gt=event.occurred_at,
+            )
+            .order_by('received_at')
+            .first()
+        )
+        if not prev_heartbeat or not next_heartbeat:
+            return
+
+        has_bridge = Heartbeat.objects.filter(
+            location=location,
+            received_at__gt=prev_heartbeat.received_at,
+            received_at__lt=next_heartbeat.received_at,
+        ).exists()
+        if has_bridge:
+            return
+
+        period_seconds = max(location.heartbeat_period_seconds, 1)
+        heartbeats = []
+        next_time = prev_heartbeat.received_at + timedelta(seconds=period_seconds)
+        while next_time < next_heartbeat.received_at:
+            heartbeats.append(Heartbeat(location=location, received_at=next_time))
+            next_time += timedelta(seconds=period_seconds)
+
+        if heartbeats:
+            Heartbeat.objects.bulk_create(heartbeats)
+        return
+
+    if event.event_type == 'power_on':
+        end_time = next_event.occurred_at if next_event else timezone.now()
+        Heartbeat.objects.filter(
+            location=location,
+            received_at__gte=event.occurred_at,
+            received_at__lt=end_time,
+        ).delete()
+
+
+def _recalculate_location_heartbeat_state(location: Location) -> None:
+    last_heartbeat = (
+        Heartbeat.objects.filter(location=location)
+        .order_by('-received_at')
+        .first()
+    )
+    if last_heartbeat:
+        location.last_heartbeat_at = last_heartbeat.received_at
+        now = timezone.now()
+        from monitoring.services import _is_location_timed_out
+        is_timed_out = _is_location_timed_out(location, now)
+        if location.is_monitoring_active:
+            location.current_power_status = (
+                PowerStatus.OFF if is_timed_out else PowerStatus.ON
+            )
+    else:
+        location.last_heartbeat_at = None
+        location.current_power_status = PowerStatus.UNKNOWN
+
+    location.save(update_fields=[
+        'last_heartbeat_at',
+        'current_power_status',
+        'updated_at',
+    ])
