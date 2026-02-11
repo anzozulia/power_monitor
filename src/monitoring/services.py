@@ -103,7 +103,7 @@ def _handle_power_restoration(location: Location, restored_at: datetime) -> None
     )
     
     # Trigger alert
-    if location.alerting_enabled and not location.alerting_failed:
+    if location.alerting_enabled:
         from monitoring.tasks import send_alert
         send_alert(
             location.id,
@@ -213,7 +213,7 @@ def _handle_power_outage(location: Location, detected_at: datetime) -> None:
     )
     
     # Trigger alert
-    if location.alerting_enabled and not location.alerting_failed:
+    if location.alerting_enabled:
         from monitoring.tasks import send_alert
         send_alert(
             location.id,
