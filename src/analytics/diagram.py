@@ -318,6 +318,18 @@ class DiagramGenerator:
                     else 'off'
                 )
                 intervals.append((last_time, end_limit, status))
+            elif not intervals and timeline:
+                # Single heartbeat in view: infer state to end_limit.
+                effective_timeout = timeout_seconds
+                if self._use_router_reconnect_grace(timeline[0], on_started_at):
+                    effective_timeout += ROUTER_RECONNECT_GRACE_SECONDS
+                status = (
+                    'on'
+                    if (end_limit - timeline[0]).total_seconds() <= effective_timeout
+                    else 'off'
+                )
+                if timeline[0] < end_limit:
+                    intervals.append((timeline[0], end_limit, status))
         else:
             end_limit = day_end
             if day_date == timezone.localdate():
