@@ -340,6 +340,7 @@ class DiagramGenerator:
         # Build segments for the day
         segments = []
         cursor = day_start
+        has_monitoring_started = day_date >= monitoring_start
 
         def add_segment(start_dt: datetime, end_dt: datetime, status: str) -> None:
             start_hour = self._to_day_hour(start_dt)
@@ -359,12 +360,14 @@ class DiagramGenerator:
             seg_start = max(start, day_start)
             seg_end = min(end, end_limit)
             if seg_start > cursor:
-                add_segment(cursor, seg_start, 'no_data')
+                gap_status = 'off' if has_monitoring_started else 'no_data'
+                add_segment(cursor, seg_start, gap_status)
             add_segment(seg_start, seg_end, status)
             cursor = max(cursor, seg_end)
 
         if cursor < end_limit:
-            add_segment(cursor, end_limit, 'no_data')
+            tail_status = 'off' if has_monitoring_started else 'no_data'
+            add_segment(cursor, end_limit, tail_status)
 
         if day_date == timezone.localdate() and end_limit < day_end:
             add_segment(end_limit, day_end, 'no_data')
