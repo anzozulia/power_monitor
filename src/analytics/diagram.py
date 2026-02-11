@@ -15,10 +15,6 @@ from django.utils import timezone
 
 from core.i18n import get_diagram_strings
 from core.models import Heartbeat, Location
-from monitoring.services import (
-    ROUTER_RECONNECT_GRACE_SECONDS,
-    ROUTER_RECONNECT_WINDOW_SECONDS,
-)
 
 logger = logging.getLogger('analytics')
 
@@ -233,18 +229,23 @@ class DiagramGenerator:
         
         Returns list of (start_hour, end_hour, status) tuples.
         """
-        # Check if monitoring was active on this day
-        if not self.location.monitoring_started_at:
-            return [(0, 24, 'no_data')]
-        
-        monitoring_start = timezone.localtime(self.location.monitoring_started_at).date()
-        if day_date < monitoring_start:
-            return [(0, 24, 'no_data')]
-        
-        # Get heartbeats for this day
         day_start = timezone.make_aware(datetime.combine(day_date, datetime.min.time()))
         day_end = day_start + timedelta(days=1)
-        
+
+        first_heartbeat = (
+            Heartbeat.objects.filter(location=self.location)
+            .order_by('received_at')
+            .values_list('received_at', flat=True)
+            .first()
+        )
+        if not first_heartbeat:
+            return [(0, 24, 'no_data')]
+
+        if first_heartbeat >= day_end:
+            return [(0, 24, 'no_data')]
+
+        timeout_seconds = self.location.timeout_seconds
+
         heartbeats = list(
             Heartbeat.objects.filter(
                 location=self.location,
@@ -263,75 +264,10 @@ class DiagramGenerator:
             .values_list('received_at', flat=True)
             .first()
         )
-        next_heartbeat = (
-            Heartbeat.objects.filter(
-                location=self.location,
-                received_at__gte=day_end,
-            )
-            .order_by('received_at')
-            .values_list('received_at', flat=True)
-            .first()
-        )
+        if prev_heartbeat and prev_heartbeat < first_heartbeat:
+            prev_heartbeat = None
 
-        timeline = []
-        if prev_heartbeat:
-            timeline.append(prev_heartbeat)
-        timeline.extend(heartbeats)
-        if next_heartbeat:
-            timeline.append(next_heartbeat)
-
-        # Build intervals from heartbeats
-        intervals = []
-        timeout_seconds = self.location.timeout_seconds
-        if timeline:
-            on_started_at = timeline[0]
-            for idx in range(len(timeline) - 1):
-                start = timeline[idx]
-                end = timeline[idx + 1]
-                effective_timeout = timeout_seconds
-                if self._use_router_reconnect_grace(start, on_started_at):
-                    effective_timeout += ROUTER_RECONNECT_GRACE_SECONDS
-                status = (
-                    'on'
-                    if (end - start).total_seconds() <= effective_timeout
-                    else 'off'
-                )
-                intervals.append((start, end, status))
-                if status == 'off':
-                    on_started_at = end
-
-            end_limit = day_end
-
-            last_time = timeline[-1]
-            if last_time < end_limit:
-                effective_timeout = timeout_seconds
-                if self._use_router_reconnect_grace(last_time, on_started_at):
-                    effective_timeout += ROUTER_RECONNECT_GRACE_SECONDS
-                status = (
-                    'on'
-                    if (end_limit - last_time).total_seconds() <= effective_timeout
-                    else 'off'
-                )
-                intervals.append((last_time, end_limit, status))
-            elif not intervals and timeline:
-                # Single heartbeat in view: infer state to end_limit.
-                effective_timeout = timeout_seconds
-                if self._use_router_reconnect_grace(timeline[0], on_started_at):
-                    effective_timeout += ROUTER_RECONNECT_GRACE_SECONDS
-                status = (
-                    'on'
-                    if (end_limit - timeline[0]).total_seconds() <= effective_timeout
-                    else 'off'
-                )
-                if timeline[0] < end_limit:
-                    intervals.append((timeline[0], end_limit, status))
-        else:
-            end_limit = day_end
-
-        # Build segments for the day
-        segments = []
-        cursor = day_start
-        has_monitoring_started = day_date >= monitoring_start
+        segments: List[Tuple[float, float, str]] = []
 
         def add_segment(start_dt: datetime, end_dt: datetime, status: str) -> None:
             start_hour = self._to_day_hour(start_dt)
@@ -343,22 +279,37 @@ class DiagramGenerator:
                 return
             segments.append((start_hour, end_hour, status))
 
-        for start, end, status in intervals:
-            if end <= day_start:
-                continue
-            if start >= end_limit:
-                break
-            seg_start = max(start, day_start)
-            seg_end = min(end, end_limit)
-            if seg_start > cursor:
-                gap_status = 'off' if has_monitoring_started else 'no_data'
-                add_segment(cursor, seg_start, gap_status)
-            add_segment(seg_start, seg_end, status)
-            cursor = max(cursor, seg_end)
+        if first_heartbeat > day_start:
+            add_segment(day_start, min(first_heartbeat, day_end), 'no_data')
 
-        if cursor < end_limit:
-            tail_status = 'off' if has_monitoring_started else 'no_data'
-            add_segment(cursor, end_limit, tail_status)
+        current_start = max(day_start, first_heartbeat)
+        last_time = prev_heartbeat
+        heartbeat_iter = heartbeats
+        if last_time is None and heartbeat_iter:
+            last_time = heartbeat_iter[0]
+            heartbeat_iter = heartbeat_iter[1:]
+
+        if last_time is None:
+            add_segment(current_start, day_end, 'off')
+            return segments if segments else [(0, 24, 'no_data')]
+
+        for hb_time in heartbeat_iter:
+            if hb_time <= last_time:
+                continue
+            green_start = max(last_time, current_start)
+            green_end = min(last_time + timedelta(seconds=timeout_seconds), hb_time)
+            if green_end > green_start:
+                add_segment(green_start, green_end, 'on')
+            if hb_time > green_end:
+                add_segment(green_end, hb_time, 'off')
+            last_time = hb_time
+
+        green_start = max(last_time, current_start)
+        green_end = min(last_time + timedelta(seconds=timeout_seconds), day_end)
+        if green_end > green_start:
+            add_segment(green_start, green_end, 'on')
+        if day_end > green_end:
+            add_segment(green_end, day_end, 'off')
 
         return segments if segments else [(0, 24, 'no_data')]
 
@@ -370,16 +321,6 @@ class DiagramGenerator:
             + local_time.minute / 60.0
             + local_time.second / 3600.0
         )
-
-    def _use_router_reconnect_grace(
-        self,
-        heartbeat_time: datetime,
-        on_started_at: datetime,
-    ) -> bool:
-        if not self.location.is_router_reconnect_window_enabled:
-            return False
-        elapsed = (heartbeat_time - on_started_at).total_seconds()
-        return elapsed <= ROUTER_RECONNECT_WINDOW_SECONDS
 
     def _get_color(self, status: str, is_current_week: bool) -> str:
         """Get the color for a status, with dimming for previous week."""
