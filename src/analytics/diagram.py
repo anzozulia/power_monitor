@@ -301,11 +301,6 @@ class DiagramGenerator:
                     on_started_at = end
 
             end_limit = day_end
-            today = timezone.localdate()
-            if day_date == today:
-                now = timezone.localtime()
-                if now < day_end:
-                    end_limit = now
 
             last_time = timeline[-1]
             if last_time < end_limit:
@@ -332,10 +327,6 @@ class DiagramGenerator:
                     intervals.append((timeline[0], end_limit, status))
         else:
             end_limit = day_end
-            if day_date == timezone.localdate():
-                now = timezone.localtime()
-                if now < day_end:
-                    end_limit = now
 
         # Build segments for the day
         segments = []
@@ -368,9 +359,6 @@ class DiagramGenerator:
         if cursor < end_limit:
             tail_status = 'off' if has_monitoring_started else 'no_data'
             add_segment(cursor, end_limit, tail_status)
-
-        if day_date == timezone.localdate() and end_limit < day_end:
-            add_segment(end_limit, day_end, 'no_data')
 
         return segments if segments else [(0, 24, 'no_data')]
 
