@@ -13,6 +13,7 @@ from django.db import transaction
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from telegram.error import TelegramError
 
 from core.models import DiagramMessage, Heartbeat, Location, PowerEvent, PowerStatus
 
@@ -191,6 +192,35 @@ def location_toggle_offline_detection(request, pk):
         })
 
     return JsonResponse({'detail': 'Method not allowed.'}, status=405)
+
+
+@login_required
+def location_test_telegram(request, pk):
+    """Send and delete a test Telegram message for a location."""
+    location = get_object_or_404(Location, pk=pk)
+
+    if request.method == 'POST':
+        if not location.telegram_bot_token or not location.telegram_chat_id:
+            messages.error(request, 'Telegram bot token or chat ID is missing.')
+            return redirect('admin_panel:location_detail', pk=pk)
+
+        try:
+            from telegram_client.client import TelegramClient
+
+            client = TelegramClient(location.telegram_bot_token)
+            message_id = client.send_message(
+                location.telegram_chat_id,
+                'Power Monitor test message.',
+                disable_notification=True,
+            )
+            client.delete_message(location.telegram_chat_id, message_id)
+            messages.success(request, 'Test message sent and deleted successfully.')
+        except TelegramError as e:
+            messages.error(request, f'Telegram error: {e}')
+        except Exception as e:
+            messages.error(request, f'Unexpected error: {e}')
+
+    return redirect('admin_panel:location_detail', pk=pk)
 
 
 @login_required

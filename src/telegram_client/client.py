@@ -34,18 +34,12 @@ class TelegramClient:
         self.bot_token = bot_token
         self._bot = None
     
-    @property
-    def bot(self) -> Bot:
-        """Lazy initialization of bot instance."""
-        if self._bot is None:
-            self._bot = Bot(token=self.bot_token)
-        return self._bot
-    
     def send_message(
         self,
         chat_id: str,
         text: str,
         parse_mode: str = "HTML",
+        disable_notification: bool = False,
     ) -> int:
         """
         Send a text message to a chat.
@@ -54,6 +48,7 @@ class TelegramClient:
             chat_id: Telegram chat/channel ID
             text: Message text (HTML formatting supported)
             parse_mode: Parse mode for formatting (HTML or Markdown)
+            disable_notification: Send silently without notification
         
         Returns:
             Message ID of the sent message
@@ -66,6 +61,7 @@ class TelegramClient:
             chat_id=chat_id,
             text=text,
             parse_mode=parse_mode,
+            disable_notification=disable_notification,
         )
     
     async def _send_message_async(
@@ -73,14 +69,40 @@ class TelegramClient:
         chat_id: str,
         text: str,
         parse_mode: str,
+        disable_notification: bool,
     ) -> int:
         """Async implementation of send_message."""
-        message = await self.bot.send_message(
+        bot = Bot(token=self.bot_token)
+        message = await bot.send_message(
             chat_id=chat_id,
             text=text,
             parse_mode=parse_mode,
+            disable_notification=disable_notification,
         )
         return message.message_id
+
+    def delete_message(self, chat_id: str, message_id: int) -> bool:
+        """
+        Delete a message in a chat.
+
+        Args:
+            chat_id: Telegram chat/channel ID
+            message_id: ID of message to delete
+
+        Returns:
+            True if successful
+        """
+        return self._run_with_retry(
+            self._delete_message_async,
+            chat_id=chat_id,
+            message_id=message_id,
+        )
+
+    async def _delete_message_async(self, chat_id: str, message_id: int) -> bool:
+        """Async implementation of delete_message."""
+        bot = Bot(token=self.bot_token)
+        await bot.delete_message(chat_id=chat_id, message_id=message_id)
+        return True
     
     def send_photo(
         self,
@@ -113,8 +135,9 @@ class TelegramClient:
         caption: Optional[str],
     ) -> int:
         """Async implementation of send_photo."""
+        bot = Bot(token=self.bot_token)
         photo.seek(0)  # Reset to beginning
-        message = await self.bot.send_photo(
+        message = await bot.send_photo(
             chat_id=chat_id,
             photo=photo,
             caption=caption,
@@ -153,9 +176,9 @@ class TelegramClient:
     ) -> bool:
         """Async implementation of edit_message_media."""
         from telegram import InputMediaPhoto
-        
+        bot = Bot(token=self.bot_token)
         photo.seek(0)
-        await self.bot.edit_message_media(
+        await bot.edit_message_media(
             chat_id=chat_id,
             message_id=message_id,
             media=InputMediaPhoto(media=photo),
@@ -181,7 +204,8 @@ class TelegramClient:
     
     async def _pin_message_async(self, chat_id: str, message_id: int) -> bool:
         """Async implementation of pin_message."""
-        await self.bot.pin_chat_message(
+        bot = Bot(token=self.bot_token)
+        await bot.pin_chat_message(
             chat_id=chat_id,
             message_id=message_id,
             disable_notification=True,
@@ -207,7 +231,8 @@ class TelegramClient:
     
     async def _unpin_message_async(self, chat_id: str, message_id: int) -> bool:
         """Async implementation of unpin_message."""
-        await self.bot.unpin_chat_message(
+        bot = Bot(token=self.bot_token)
+        await bot.unpin_chat_message(
             chat_id=chat_id,
             message_id=message_id,
         )
@@ -227,9 +252,11 @@ class TelegramClient:
                 # Run the async function
                 loop = asyncio.new_event_loop()
                 try:
+                    asyncio.set_event_loop(loop)
                     result = loop.run_until_complete(coro_func(**kwargs))
                     return result
                 finally:
+                    asyncio.set_event_loop(None)
                     loop.close()
                     
             except RetryAfter as e:

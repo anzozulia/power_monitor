@@ -25,6 +25,11 @@ urlpatterns = [
     path('admin/locations/<uuid:pk>/delete/', views.location_delete, name='location_delete'),
     path('admin/locations/<uuid:pk>/reset/', views.location_reset, name='location_reset'),
     path(
+        'admin/locations/<uuid:pk>/test-telegram/',
+        views.location_test_telegram,
+        name='location_test_telegram',
+    ),
+    path(
         'admin/locations/<uuid:pk>/events/<int:event_id>/delete/',
         views.power_event_delete,
         name='power_event_delete',

@@ -145,6 +145,18 @@
                 </dd>
             </div>
             <div>
+                <dt class="text-sm font-medium text-gray-500">Test Telegram</dt>
+                <dd class="mt-1 text-sm text-gray-900">
+                    <form method="post" action="{% url 'admin_panel:location_test_telegram' pk=location.pk %}">
+                        {% csrf_token %}
+                        <button type="submit"
+                                class="inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500">
+                            Send Test Message
+                        </button>
+                    </form>
+                </dd>
+            </div>
+            <div>
                 <dt class="text-sm font-medium text-gray-500">Maintenance Mode</dt>
                 <dd class="mt-1 text-sm text-gray-900">
                     <button type="button"
