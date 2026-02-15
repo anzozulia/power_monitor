@@ -234,6 +234,10 @@ class DiagramGenerator:
         """
         day_start = timezone.make_aware(datetime.combine(day_date, datetime.min.time()))
         day_end = day_start + timedelta(days=1)
+        if day_date == timezone.localdate():
+            now = timezone.localtime()
+            if now < day_end:
+                day_end = now
 
         first_heartbeat = (
             Heartbeat.objects.filter(location=self.location)
@@ -241,10 +245,7 @@ class DiagramGenerator:
             .values_list('received_at', flat=True)
             .first()
         )
-        if not first_heartbeat:
-            return [(0, 24, 'no_data')]
-
-        if first_heartbeat >= day_end:
+        if not first_heartbeat or first_heartbeat >= day_end:
             return [(0, 24, 'no_data')]
 
         timeout_seconds = self.location.timeout_seconds
@@ -271,6 +272,9 @@ class DiagramGenerator:
             prev_heartbeat = None
 
         segments: List[Tuple[float, float, str]] = []
+        current = day_start
+        last_heartbeat = prev_heartbeat
+        on_started_at = prev_heartbeat
 
         def add_segment(start_dt: datetime, end_dt: datetime, status: str) -> None:
             start_hour = self._to_day_hour(start_dt)
@@ -282,45 +286,46 @@ class DiagramGenerator:
                 return
             segments.append((start_hour, end_hour, status))
 
-        if first_heartbeat > day_start:
-            add_segment(day_start, min(first_heartbeat, day_end), 'no_data')
+        def effective_timeout(base_time: datetime) -> int:
+            if on_started_at and self._use_router_reconnect_grace(base_time, on_started_at):
+                return timeout_seconds + ROUTER_RECONNECT_GRACE_SECONDS
+            return timeout_seconds
 
-        current_start = max(day_start, first_heartbeat)
-        last_time = prev_heartbeat
-        on_started_at = prev_heartbeat or first_heartbeat
-        heartbeat_iter = heartbeats
-        if last_time is None and heartbeat_iter:
-            last_time = heartbeat_iter[0]
-            heartbeat_iter = heartbeat_iter[1:]
+        def fill_until(target_time: datetime) -> None:
+            nonlocal current
+            if current >= target_time:
+                return
+            if last_heartbeat is None:
+                add_segment(current, target_time, 'no_data')
+                current = target_time
+                return
+            on_until = last_heartbeat + timedelta(seconds=effective_timeout(last_heartbeat))
+            if current < on_until:
+                green_end = min(on_until, target_time)
+                add_segment(current, green_end, 'on')
+                current = green_end
+            if current < target_time:
+                add_segment(current, target_time, 'off')
+                current = target_time
 
-        if last_time is None:
-            add_segment(current_start, day_end, 'off')
-            return segments if segments else [(0, 24, 'no_data')]
+        # Pre-first-heartbeat gray
+        if current < first_heartbeat:
+            fill_until(min(first_heartbeat, day_end))
 
-        for hb_time in heartbeat_iter:
-            if hb_time <= last_time:
+        for hb_time in heartbeats:
+            if hb_time < current:
+                last_heartbeat = hb_time
+                if on_started_at is None:
+                    on_started_at = hb_time
                 continue
-            effective_timeout = timeout_seconds
-            if self._use_router_reconnect_grace(last_time, on_started_at):
-                effective_timeout += ROUTER_RECONNECT_GRACE_SECONDS
-            green_start = max(last_time, current_start)
-            green_end = min(last_time + timedelta(seconds=effective_timeout), hb_time)
-            if green_end > green_start:
-                add_segment(green_start, green_end, 'on')
-            if hb_time > green_end:
-                add_segment(green_end, hb_time, 'off')
+            fill_until(hb_time)
+            if last_heartbeat is None or hb_time - last_heartbeat > timedelta(seconds=effective_timeout(last_heartbeat)):
                 on_started_at = hb_time
-            last_time = hb_time
+            last_heartbeat = hb_time
+            current = hb_time
 
-        effective_timeout = timeout_seconds
-        if self._use_router_reconnect_grace(last_time, on_started_at):
-            effective_timeout += ROUTER_RECONNECT_GRACE_SECONDS
-        green_start = max(last_time, current_start)
-        green_end = min(last_time + timedelta(seconds=effective_timeout), day_end)
-        if green_end > green_start:
-            add_segment(green_start, green_end, 'on')
-        if day_end > green_end:
-            add_segment(green_end, day_end, 'off')
+        if current < day_end:
+            fill_until(day_end)
 
         return segments if segments else [(0, 24, 'no_data')]
 
