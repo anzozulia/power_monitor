@@ -276,9 +276,18 @@ class DiagramGenerator:
         last_heartbeat = prev_heartbeat
         on_started_at = prev_heartbeat
 
+        def to_day_hour(timestamp: datetime) -> float:
+            delta = timestamp - day_start
+            hour = delta.total_seconds() / 3600.0
+            if hour < 0:
+                return 0.0
+            if hour > 24:
+                return 24.0
+            return hour
+
         def add_segment(start_dt: datetime, end_dt: datetime, status: str) -> None:
-            start_hour = self._to_day_hour(start_dt)
-            end_hour = self._to_day_hour(end_dt)
+            start_hour = to_day_hour(start_dt)
+            end_hour = to_day_hour(end_dt)
             if end_hour <= start_hour:
                 return
             if segments and segments[-1][2] == status and abs(segments[-1][1] - start_hour) < 0.0001:
@@ -328,15 +337,6 @@ class DiagramGenerator:
             fill_until(day_end)
 
         return segments if segments else [(0, 24, 'no_data')]
-
-    @staticmethod
-    def _to_day_hour(timestamp: datetime) -> float:
-        local_time = timezone.localtime(timestamp)
-        return (
-            local_time.hour
-            + local_time.minute / 60.0
-            + local_time.second / 3600.0
-        )
 
     def _use_router_reconnect_grace(
         self,
